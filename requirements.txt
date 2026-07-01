@@ -1,0 +1,24 @@
+# Dataset download
+kaggle>=1.6.17
+
+# YOLO training/export
+ultralytics>=8.3.0
+
+# Core ML
+torch>=2.3.0
+torchvision>=0.18.0
+
+# Experiment tracking
+mlflow>=2.14.0
+
+# ONNX export and Python-side inference
+onnx>=1.16.0
+onnxruntime>=1.18.0
+
+# Image processing and data utilities
+opencv-python>=4.10.0
+numpy>=1.26.0
+PyYAML>=6.0.1
+
+# Testing
+pytest>=8.2.0
