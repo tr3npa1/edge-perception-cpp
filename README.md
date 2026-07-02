@@ -1,25 +1,26 @@
 # edge-perception-cpp
 
-Native C++ object detection inference pipeline using ONNX Runtime and OpenCV.
+Performance-oriented object detection deployment pipeline using YOLO26M, ONNX Runtime, OpenCV, and native C++.
 
-This project trains a YOLO26M detector on BDD100K driving-scene data, exports the trained model to ONNX, and runs inference through a native C++ runtime. The focus is the deployment path: preprocessing images with OpenCV, executing the model with ONNX Runtime, decoding detections, applying postprocessing, and benchmarking inference latency.
+This project trains a YOLO26M detector on BDD100K driving-scene data, exports the model for deployment, and implements a native C++ inference pipeline focused on low end-to-end latency. The goal is to control the full deployment path: preprocessing, inference, postprocessing, memory reuse, backend selection, and benchmarking.
 
 ---
 
 ## Pipeline
 
 ```text
-BDD100K Kaggle dataset
-→ dataset download and validation
-→ YOLO26M training/fine-tuning
-→ model evaluation
-→ ONNX export
-→ PyTorch vs ONNX parity check
-→ C++ ONNX Runtime inference
-→ OpenCV preprocessing
-→ detection postprocessing
-→ latency benchmarking
-→ optional INT8 quantization
+BDD100K YOLO dataset
+→ dataset download
+→ dataset validation and local YAML preparation
+→ YOLO26M training
+→ evaluation
+→ ONNX / TensorRT export
+→ PyTorch vs exported-model parity testing
+→ native C++ inference
+→ optimized OpenCV preprocessing
+→ optimized YOLO postprocessing
+→ backend benchmarking
+→ optional FP16 / INT8 / TensorRT acceleration
 ```
 
 ---
@@ -29,16 +30,31 @@ BDD100K Kaggle dataset
 ```text
 [done] data/download.py
 [done] README.md
-[pending] .gitignore
-[pending] requirements.txt
-[pending] data/dataset.py
+[done] .gitignore
+[done] requirements.txt
+[done] data/dataset.py
+
 [pending] training/train_detector.py
 [pending] training/evaluate.py
-[pending] training/export_onnx.py
+[pending] training/export_model.py
 [pending] tests/test_parity.py
-[pending] C++ inference engine
-[pending] benchmarking
-[pending] optional INT8 quantization
+
+[pending] CMakeLists.txt
+[pending] include/image_processor.hpp
+[pending] src/image_processor.cpp
+[pending] include/inference_engine.hpp
+[pending] src/inference_engine.cpp
+[pending] include/postprocess.hpp
+[pending] src/postprocess.cpp
+[pending] include/benchmark.hpp
+[pending] src/benchmark.cpp
+[pending] src/main.cpp
+[pending] tests/test_inference.cpp
+
+[pending] CUDA / TensorRT provider support
+[pending] FP16 export and benchmark support
+[pending] INT8 calibration
+[pending] async / pipelined benchmark mode
 [pending] Docker
 ```
 
@@ -53,19 +69,22 @@ edge-perception-cpp/
 │   └── dataset.py
 ├── training/
 │   ├── train_detector.py
-│   ├── export_onnx.py
-│   └── evaluate.py
-├── src/
-│   ├── main.cpp
-│   ├── inference_engine.cpp
-│   ├── image_processor.cpp
-│   └── postprocess.cpp
+│   ├── evaluate.py
+│   └── export_model.py
 ├── include/
+│   ├── image_processor.hpp
 │   ├── inference_engine.hpp
-│   └── image_processor.hpp
+│   ├── postprocess.hpp
+│   └── benchmark.hpp
+├── src/
+│   ├── image_processor.cpp
+│   ├── inference_engine.cpp
+│   ├── postprocess.cpp
+│   ├── benchmark.cpp
+│   └── main.cpp
 ├── tests/
-│   ├── test_inference.cpp
-│   └── test_parity.py
+│   ├── test_parity.py
+│   └── test_inference.cpp
 ├── CMakeLists.txt
 ├── Dockerfile
 ├── requirements.txt
@@ -77,38 +96,43 @@ edge-perception-cpp/
 
 ## Dataset
 
-The project uses a BDD100K dataset hosted on Kaggle.
+The project uses a YOLO-format BDD100K dataset hosted on Kaggle.
 
-The current download script is designed for a YOLO-format BDD100K dataset, meaning the downloaded dataset is expected to contain:
-
-```text
-images/
-labels/
-data.yaml
-```
-
-Default Kaggle dataset slug:
-
-```text
-a7madmostafa/bdd100k-yolo
-```
-
-After running the download script, the expected project-local dataset path is:
+Expected raw dataset location:
 
 ```text
 data/raw/bdd100k/bdd100k/
 ```
 
-Expected layout:
+Expected dataset layout:
 
 ```text
-data/raw/bdd100k/
-├── kaggle_download/
-├── bdd100k/
+data/raw/bdd100k/bdd100k/
+├── data.yaml
+├── train/
 │   ├── images/
-│   ├── labels/
-│   └── data.yaml
-└── download_manifest.json
+│   └── labels/
+├── val/
+│   ├── images/
+│   └── labels/
+└── test/
+    ├── images/
+    └── labels/
+```
+
+Expected classes:
+
+```text
+person
+rider
+car
+bus
+truck
+bike
+motor
+traffic light
+traffic sign
+train
 ```
 
 Large dataset files are not committed to Git.
@@ -123,26 +147,13 @@ Dataset download is handled by:
 data/download.py
 ```
 
-The script:
-
-```text
-downloads the Kaggle dataset
-extracts the downloaded archive
-creates a stable local dataset directory
-finds the images directory
-finds the labels directory
-finds the dataset YAML
-validates that the dataset is usable
-writes download_manifest.json
-```
+The script downloads the Kaggle dataset, extracts it, validates the raw structure, and writes a download manifest.
 
 Install the Kaggle CLI:
 
 ```bash
 pip install kaggle
 ```
-
-Configure the Kaggle API token before running the script.
 
 Run the default download:
 
@@ -156,42 +167,97 @@ Run a clean re-download:
 python data/download.py --clean --force-download
 ```
 
-Validate existing data without downloading again:
+Validate existing downloaded data:
 
 ```bash
 python data/download.py --validate-only
 ```
 
-Use a different Kaggle dataset slug:
+Expected raw output:
 
-```bash
-python data/download.py --kaggle-dataset <owner>/<dataset-name>
+```text
+data/raw/bdd100k/
+├── kaggle_download/
+├── bdd100k/
+└── download_manifest.json
 ```
 
 ---
 
-## Download Manifest
+## Dataset Preparation
 
-After dataset preparation, the script writes:
+Dataset preparation is handled by:
 
 ```text
-data/raw/bdd100k/download_manifest.json
+data/dataset.py
 ```
 
-The manifest records:
+The raw Kaggle dataset is preserved unchanged. The preparation script validates the YOLO dataset and writes a clean local training YAML.
+
+Run:
+
+```bash
+python data/dataset.py
+```
+
+Validate only:
+
+```bash
+python data/dataset.py --validate-only
+```
+
+Generated files:
 
 ```text
-Kaggle dataset slug
-raw directory
-download directory
-stable dataset directory
-resolved images directory
-resolved labels directory
-resolved dataset YAML path
-image count
-label count
-validation result
-creation timestamp
+data/processed/bdd100k_yolo/bdd100k.yaml
+data/processed/bdd100k_yolo/dataset_summary.json
+```
+
+Training scripts should use:
+
+```text
+data/processed/bdd100k_yolo/bdd100k.yaml
+```
+
+The preparation script checks:
+
+```text
+source dataset YAML
+class names
+nc value
+train / val / test image paths
+matching YOLO label files
+YOLO label line format
+```
+
+---
+
+## Model
+
+Planned detector:
+
+```text
+YOLO26M
+```
+
+The model will be trained or fine-tuned on BDD100K and exported for native inference.
+
+Initial deployment target:
+
+```text
+batch size: 1
+input size: 640x640
+precision: FP32
+```
+
+Later deployment targets:
+
+```text
+FP16
+INT8
+TensorRT engine
+ONNX Runtime CUDA provider
+ONNX Runtime TensorRT provider
 ```
 
 ---
@@ -204,28 +270,27 @@ Training will be handled by:
 training/train_detector.py
 ```
 
-Planned model:
+Expected training input:
 
 ```text
-YOLO26M
-```
-
-Expected training dataset input:
-
-```text
-data/raw/bdd100k/bdd100k/data.yaml
+data/processed/bdd100k_yolo/bdd100k.yaml
 ```
 
 The training script will be responsible for:
 
 ```text
-loading pretrained YOLO26M weights
-loading the BDD100K dataset YAML
-configuring training settings
-fine-tuning the detector
+loading YOLO26M weights
+loading the prepared BDD100K YAML
+configuring training parameters
 saving checkpoints
-saving metrics
-saving sample predictions
+saving run metadata
+supporting resume
+```
+
+Planned example command:
+
+```bash
+python training/train_detector.py --data data/processed/bdd100k_yolo/bdd100k.yaml --epochs 50 --imgsz 640 --batch 16 --device 0
 ```
 
 ---
@@ -238,115 +303,196 @@ Evaluation will be handled by:
 training/evaluate.py
 ```
 
+The evaluation script will measure detection quality separately from deployment speed.
+
 Planned outputs:
 
 ```text
-mAP@50
-mAP@75
+mAP50
+mAP50-95
 precision
 recall
 per-class metrics
-metrics JSON
-sample prediction images
+evaluation metrics JSON
+sample predictions
 ```
+
+No speed claims should be reported from the evaluation script.
 
 ---
 
-## ONNX Export
+## Model Export
 
-ONNX export will be handled by:
+Model export will be handled by:
 
 ```text
-training/export_onnx.py
+training/export_model.py
 ```
 
-Planned export target:
+The export script will support deployment-focused model formats.
+
+Planned exports:
 
 ```text
 FP32 ONNX
+FP16 ONNX
+TensorRT engine
+INT8 engine or quantized model
 ```
 
 The export script should record:
 
 ```text
-exported ONNX path
+exported model path
 input tensor name
 input tensor shape
 output tensor names
 output tensor shapes
-ONNX Runtime smoke-test result
-```
-
-Optional later exports:
-
-```text
-FP16 ONNX
-INT8 ONNX
+precision mode
+opset
+backend/export format
+smoke-test result
+export metadata
 ```
 
 ---
 
 ## Parity Testing
 
-PyTorch vs ONNX parity will be checked by:
+Parity testing will be handled by:
 
 ```text
 tests/test_parity.py
 ```
 
-The test should compare model outputs between:
+The test will compare outputs between the trained model and exported deployment models.
+
+Planned comparisons:
 
 ```text
-YOLO/PyTorch
-ONNX Runtime
+PyTorch / Ultralytics output
+ONNX Runtime output
+TensorRT output if available
 ```
 
-The comparison may include:
-
-```text
-box coordinates
-confidence scores
-class IDs
-number of detections
-max absolute difference
-mean absolute difference
-```
+The goal is to confirm that exported models remain numerically and functionally consistent before C++ benchmarking.
 
 ---
 
-## C++ Inference
+## Native C++ Inference
 
 The native inference pipeline will use:
 
 ```text
+C++17 or newer
 OpenCV
 ONNX Runtime C++
-C++17 or newer
 ```
 
-Planned inference flow:
+Planned executable:
 
 ```text
-load image with OpenCV
+edge_perception
+```
+
+Core inference flow:
+
+```text
+load image
 ↓
-resize or letterbox
+preprocess with OpenCV
 ↓
-convert BGR HWC uint8 to RGB NCHW float32
+write directly into model input buffer
 ↓
-run ONNX Runtime inference
+run inference
 ↓
-decode model outputs
+decode detections
 ↓
 apply confidence threshold
 ↓
-apply NMS if required
+apply NMS if needed
 ↓
-draw detections
+scale boxes back to original image
 ↓
-save output image
-↓
-report latency
+return final detections
 ```
+
+The C++ path is designed around reusable components:
+
+```text
+ImageProcessor
+InferenceEngine
+Postprocess
+Benchmark
+```
+
+---
+
+## Performance Design
+
+Performance is a first-class project goal.
+
+The native pipeline should minimize:
+
+```text
+unnecessary memory allocation
+unnecessary image copies
+Python/framework overhead
+slow generic preprocessing
+slow postprocessing
+unmeasured visualization overhead
+```
+
+Planned implementation choices:
+
+```text
+preallocated input buffers
+preallocated output buffers where practical
+single-pass BGR HWC uint8 to RGB NCHW float conversion
+static input shapes
+warmup iterations before timing
+separate timing for preprocessing, inference, postprocessing, and total latency
+backend selection through the inference engine
+optional CUDA and TensorRT acceleration
+```
+
+Benchmarking should report:
+
+```text
+mean latency
+median latency
+p95 latency
+FPS
+model size
+precision mode
+backend
+input size
+hardware
+```
+
+Benchmark results should only be added after they are measured locally.
+
+---
+
+## Backends
+
+Planned backend support:
+
+```text
+ONNX Runtime CPU
+ONNX Runtime CUDA Execution Provider
+ONNX Runtime TensorRT Execution Provider
+native TensorRT backend if needed
+```
+
+The project should distinguish between:
+
+```text
+raw model inference latency
+end-to-end pipeline latency
+```
+
+Raw TensorRT engine latency is treated as a strong lower-bound model-execution baseline. The native C++ pipeline focuses on reducing full end-to-end deployment latency.
 
 ---
 
@@ -358,7 +504,7 @@ OpenCV loads images as:
 HWC BGR uint8
 ```
 
-YOLO-style ONNX models typically expect:
+YOLO-style deployed models typically expect:
 
 ```text
 NCHW RGB float32
@@ -367,63 +513,76 @@ NCHW RGB float32
 The preprocessing implementation must handle:
 
 ```text
-BGR to RGB conversion
+image load
 resize or letterbox
-uint8 to float32 conversion
+BGR to RGB conversion
+uint8 to float conversion
 normalization
 HWC to NCHW layout conversion
 batch dimension creation
+letterbox metadata for box rescaling
 ```
 
-The optimization target is a reusable preallocated input buffer for reducing repeated allocations during inference.
+The optimized path should avoid unnecessary intermediate buffers where practical.
+
+---
+
+## Postprocessing
+
+Postprocessing will be handled by:
+
+```text
+include/postprocess.hpp
+src/postprocess.cpp
+```
+
+The postprocessing implementation should support:
+
+```text
+confidence thresholding
+class IDs
+box decoding
+NMS if required
+no-NMS path if exported model returns final detections
+box scaling back to original image size
+```
+
+Drawing detections should be optional and excluded from benchmark timing unless explicitly requested.
 
 ---
 
 ## Benchmarking
 
-Benchmarking will compare:
+Benchmarking will be handled by:
 
 ```text
-Python YOLO inference
-Python ONNX Runtime inference
-C++ ONNX Runtime inference
-optional C++ ONNX Runtime INT8 inference
+include/benchmark.hpp
+src/benchmark.cpp
+src/main.cpp
 ```
 
-Measured components:
+Benchmark mode should measure:
 
 ```text
+image loading latency
 preprocessing latency
 inference latency
 postprocessing latency
 end-to-end latency
-FPS
-model size
-memory usage
 ```
 
-No benchmark numbers should be reported unless measured locally.
-
----
-
-## Artifact Policy
-
-The repository should track source code, configuration, and documentation.
-
-The repository should not track large generated artifacts such as:
+Benchmark rules:
 
 ```text
-data/raw/
-data/processed/
-runs/
-mlruns/
-models/
-weights/
-checkpoints/
-*.pt
-*.onnx
-outputs/
-benchmarks/
+use the same image set across backends
+use the same model variant across backends
+use the same input size
+use the same confidence threshold
+use the same IoU threshold
+run warmup iterations before timed iterations
+do not include model export time
+do not include TensorRT engine build time in steady-state inference latency
+do not include drawing time unless reported separately
 ```
 
 ---
@@ -438,36 +597,77 @@ benchmarks/
 5. data/dataset.py
 6. training/train_detector.py
 7. training/evaluate.py
-8. training/export_onnx.py
+8. training/export_model.py
 9. tests/test_parity.py
 10. CMakeLists.txt
 11. include/image_processor.hpp
 12. src/image_processor.cpp
 13. include/inference_engine.hpp
 14. src/inference_engine.cpp
-15. src/postprocess.cpp
-16. src/main.cpp
-17. benchmark mode
-18. preprocessing optimization
-19. optional INT8 quantization
+15. include/postprocess.hpp
+16. src/postprocess.cpp
+17. include/benchmark.hpp
+18. src/benchmark.cpp
+19. src/main.cpp
 20. tests/test_inference.cpp
-21. Dockerfile
+21. CUDA / TensorRT provider support
+22. FP16 export and benchmark support
+23. INT8 calibration
+24. async / pipelined benchmark mode
+25. Dockerfile
+26. final README polish
+```
+
+---
+
+## Artifact Policy
+
+The repository tracks source code, build configuration, and documentation.
+
+The repository does not track large or generated artifacts such as:
+
+```text
+data/raw/
+data/processed/
+runs/
+mlruns/
+models/
+weights/
+checkpoints/
+outputs/
+benchmarks/
+*.pt
+*.pth
+*.onnx
+*.engine
 ```
 
 ---
 
 ## Current Focus
 
-Current completed files:
+Completed files:
 
 ```text
 data/download.py
 README.md
-```
-
-Next files:
-
-```text
 .gitignore
 requirements.txt
+data/dataset.py
+```
+
+Current dataset flow:
+
+```text
+Kaggle BDD100K YOLO dataset
+→ data/download.py
+→ data/raw/bdd100k/bdd100k/
+→ data/dataset.py
+→ data/processed/bdd100k_yolo/bdd100k.yaml
+```
+
+Next file:
+
+```text
+training/train_detector.py
 ```
