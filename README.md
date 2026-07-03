@@ -2,7 +2,21 @@
 
 Performance-oriented object detection deployment pipeline using YOLO26M, ONNX Runtime, OpenCV, and native C++.
 
-This project trains a YOLO26M detector on BDD100K driving-scene data, exports the model for deployment, and implements a native C++ inference pipeline focused on low end-to-end latency. The goal is to control the full deployment path: preprocessing, inference, postprocessing, memory reuse, backend selection, and benchmarking.
+This project trains a YOLO26M detector on BDD100K driving-scene data, exports the trained model for deployment, and implements a native C++ inference pipeline focused on low end-to-end latency.
+
+The goal is to control the full deployment path:
+
+```text
+dataset preparation
+training
+evaluation
+model export
+preprocessing
+inference
+postprocessing
+benchmarking
+backend comparison
+```
 
 ---
 
@@ -13,9 +27,10 @@ BDD100K YOLO dataset
 → dataset download
 → dataset validation and local YAML preparation
 → YOLO26M training
+→ MLflow experiment tracking
 → evaluation
 → ONNX / TensorRT export
-→ PyTorch vs exported-model parity testing
+→ parity testing
 → native C++ inference
 → optimized OpenCV preprocessing
 → optimized YOLO postprocessing
@@ -33,8 +48,8 @@ BDD100K YOLO dataset
 [done] .gitignore
 [done] requirements.txt
 [done] data/dataset.py
+[done] training/train_detector.py
 
-[pending] training/train_detector.py
 [pending] training/evaluate.py
 [pending] training/export_model.py
 [pending] tests/test_parity.py
@@ -104,7 +119,7 @@ Expected raw dataset location:
 data/raw/bdd100k/bdd100k/
 ```
 
-Expected dataset layout:
+Expected raw dataset layout:
 
 ```text
 data/raw/bdd100k/bdd100k/
@@ -147,7 +162,7 @@ Dataset download is handled by:
 data/download.py
 ```
 
-The script downloads the Kaggle dataset, extracts it, validates the raw structure, and writes a download manifest.
+The script downloads the Kaggle dataset, extracts it, performs a raw dataset smoke check, and writes a download manifest.
 
 Install the Kaggle CLI:
 
@@ -213,7 +228,7 @@ data/processed/bdd100k_yolo/bdd100k.yaml
 data/processed/bdd100k_yolo/dataset_summary.json
 ```
 
-Training scripts should use:
+Training scripts use:
 
 ```text
 data/processed/bdd100k_yolo/bdd100k.yaml
@@ -240,7 +255,16 @@ Planned detector:
 YOLO26M
 ```
 
-The model will be trained or fine-tuned on BDD100K and exported for native inference.
+Initial training target:
+
+```text
+dataset: BDD100K
+input size: 640x640
+batch size: 16
+epochs: 100
+device: single GPU
+precision: AMP enabled
+```
 
 Initial deployment target:
 
@@ -264,7 +288,7 @@ ONNX Runtime TensorRT provider
 
 ## Training
 
-Training will be handled by:
+Training is handled by:
 
 ```text
 training/train_detector.py
@@ -276,22 +300,121 @@ Expected training input:
 data/processed/bdd100k_yolo/bdd100k.yaml
 ```
 
-The training script will be responsible for:
+The training script is responsible for:
 
 ```text
 loading YOLO26M weights
-loading the prepared BDD100K YAML
-configuring training parameters
-saving checkpoints
-saving run metadata
-supporting resume
+validating the prepared BDD100K YAML
+training or resuming YOLO26M
+saving best.pt and last.pt
+saving local training metadata
+logging the run to MLflow
+logging training configuration and artifacts
 ```
 
-Planned example command:
+Full training command:
 
 ```bash
-python training/train_detector.py --data data/processed/bdd100k_yolo/bdd100k.yaml --epochs 50 --imgsz 640 --batch 16 --device 0
+python training/train_detector.py \
+  --mlflow-tracking-uri http://127.0.0.1:5000 \
+  --epochs 100 \
+  --imgsz 640 \
+  --batch 16 \
+  --device 0
 ```
+
+Smoke-test command:
+
+```bash
+python training/train_detector.py \
+  --mlflow-tracking-uri http://127.0.0.1:5000 \
+  --epochs 1 \
+  --imgsz 640 \
+  --batch 8 \
+  --device 0 \
+  --fraction 0.05 \
+  --name smoke_yolo26m_bdd100k \
+  --mlflow-run-name smoke_yolo26m_bdd100k
+```
+
+The checkpoint to use for later evaluation and export is:
+
+```text
+runs/train/<run_name>/weights/best.pt
+```
+
+The final epoch checkpoint is:
+
+```text
+runs/train/<run_name>/weights/last.pt
+```
+
+---
+
+## MLflow Tracking
+
+MLflow is used for experiment tracking during training.
+
+The training script logs:
+
+```text
+training parameters
+dataset information
+training metadata
+Ultralytics args.yaml
+Ultralytics results.csv
+training duration
+run directory
+best checkpoint path
+last checkpoint path
+```
+
+The Ultralytics run directory also stores:
+
+```text
+results.csv
+results.png
+args.yaml
+weights/best.pt
+weights/last.pt
+```
+
+MLflow is useful for comparing runs, while the local Ultralytics run folder remains the source of truth for training outputs.
+
+Start an MLflow server separately if needed:
+
+```bash
+mlflow ui --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
+```
+
+Then train with:
+
+```bash
+python training/train_detector.py --mlflow-tracking-uri http://127.0.0.1:5000
+```
+
+---
+
+## Checkpoints
+
+Ultralytics saves two main checkpoints:
+
+```text
+best.pt
+last.pt
+```
+
+Use `best.pt` for evaluation, export, and deployment.
+
+```text
+best.pt
+    best validation-fitness checkpoint
+
+last.pt
+    final epoch checkpoint
+```
+
+The deployment pipeline should not blindly use `last.pt`.
 
 ---
 
@@ -654,9 +777,10 @@ README.md
 .gitignore
 requirements.txt
 data/dataset.py
+training/train_detector.py
 ```
 
-Current dataset flow:
+Current training flow:
 
 ```text
 Kaggle BDD100K YOLO dataset
@@ -664,10 +788,12 @@ Kaggle BDD100K YOLO dataset
 → data/raw/bdd100k/bdd100k/
 → data/dataset.py
 → data/processed/bdd100k_yolo/bdd100k.yaml
+→ training/train_detector.py
+→ runs/train/<run_name>/weights/best.pt
 ```
 
 Next file:
 
 ```text
-training/train_detector.py
+training/evaluate.py
 ```

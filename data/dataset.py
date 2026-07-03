@@ -79,7 +79,7 @@ class DatasetReport:
 
 
 def setup_logging() -> None:
-    """Configure readable console logging"""
+    """Configure readable console logging."""
 
     logging.basicConfig(
         level=logging.INFO,
@@ -88,7 +88,7 @@ def setup_logging() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arugments"""
+    """Parse command-line arguments."""
     
     parser = argparse.ArgumentParser(
         description="Validate YOLO-format BDD100K and write a clean training YAML."
@@ -322,7 +322,7 @@ def resolve_yaml_base_dir(source_yaml: Path, yaml_payload: dict[str, Any]) -> Pa
     return (source_yaml.parent / base_path).resolve()
 
 
-def resolve_path_entry(entry: Any, base_dir: Path) ->list[Path]:
+def resolve_path_entry(entry: Any, base_dir: Path) -> list[Path]:
     """Resolve a YAML split entry into absolute paths."""
     
     if entry is None:
@@ -569,7 +569,7 @@ def parse_label_line(
     
     if class_id < 0 or class_id >= class_count:
         return(
-            f"{label_path}:{line_number} class id {class_id} outside"
+            f"{label_path}:{line_number} class id {class_id} outside "
             f"valid range [0,{class_count - 1}]."
         )
     
