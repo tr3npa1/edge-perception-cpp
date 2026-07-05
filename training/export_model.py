@@ -49,7 +49,7 @@ import yaml
 
 LOGGER = logging.getLogger("export_yolo26m_model")
 
-DEFAULT_WEIGHTS = Path("runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt")
+DEFAULT_WEIGHTS = Path("runs/train/yolo26m_bdd100k/weights/best.pt")
 DEFAULT_DATA_YAML = Path("data/processed/bdd100k_yolo/bdd100k.yaml")
 DEFAULT_ONNX_DIR = Path("models/onnx")
 DEFAULT_ENGINE_DIR = Path("models/engine")

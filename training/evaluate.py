@@ -53,7 +53,7 @@ import yaml
 
 LOGGER = logging.getLogger("evaluate_yolo26m")
 
-DEFAULT_WEIGHTS = Path("runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt")
+DEFAULT_WEIGHTS = Path("runs/train/yolo26m_bdd100k/weights/best.pt")
 DEFAULT_DATA_YAML = Path("data/processed/bdd100k_yolo/bdd100k.yaml")
 DEFAULT_OUTPUT_DIR = Path("runs/evaluate")
 DEFAULT_RUN_NAME = "yolo26m_bdd100k_eval"
