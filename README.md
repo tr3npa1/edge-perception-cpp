@@ -504,7 +504,7 @@ python training/train_detector.py \
 Important output path:
 
 ```text
-runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt
+runs/train/yolo26m_bdd100k/weights/best.pt
 ```
 
 Use `best.pt` for evaluation, export, and deployment.
@@ -566,7 +566,7 @@ Recommended full artifact evaluation command:
 
 ```bash
 python training/evaluate.py \
-  --weights runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt \
+  --weights runs/train/yolo26m_bdd100k/weights/best.pt \
   --data data/processed/bdd100k_yolo/bdd100k.yaml \
   --split test \
   --imgsz 640 \
@@ -617,7 +617,7 @@ training/export_model.py
 Expected input checkpoint:
 
 ```text
-runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt
+runs/train/yolo26m_bdd100k/weights/best.pt
 ```
 
 Expected dataset YAML:
@@ -647,7 +647,7 @@ Recommended full export command:
 
 ```bash
 python training/export_model.py \
-  --weights runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt \
+  --weights runs/train/yolo26m_bdd100k/weights/best.pt \
   --data data/processed/bdd100k_yolo/bdd100k.yaml \
   --variants all \
   --imgsz 640 \
@@ -799,7 +799,7 @@ Use explicit parity checks only when debugging export correctness:
 
 ```bash
 python training/evaluate.py \
-  --weights runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt \
+  --weights runs/train/yolo26m_bdd100k/weights/best.pt \
   --data data/processed/bdd100k_yolo/bdd100k.yaml \
   --onnx models/onnx/yolo26m_bdd100k_fp32.onnx \
   --parity \
@@ -1109,7 +1109,7 @@ Kaggle BDD100K YOLO dataset
 → data/dataset.py
 → data/processed/bdd100k_yolo/bdd100k.yaml
 → training/train_detector.py
-→ runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt
+→ runs/train/yolo26m_bdd100k/weights/best.pt
 → training/export_model.py
 → models/onnx/*.onnx and models/engine/*.engine
 → training/evaluate.py
