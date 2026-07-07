@@ -1,180 +1,77 @@
-# ---------------------------------------------------------------------------
 # Python
-# ---------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.so
-*.egg
 *.egg-info/
-.eggs/
-build/
-dist/
-site/
-.python-version
-
-# ---------------------------------------------------------------------------
-# Virtual environments
-# ---------------------------------------------------------------------------
-.venv/
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-
-# ---------------------------------------------------------------------------
-# Python tooling and caches
-# ---------------------------------------------------------------------------
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.coverage
-coverage.xml
-htmlcov/
-.ipynb_checkpoints/
 
-# ---------------------------------------------------------------------------
-# Environment variables and secrets
-# ---------------------------------------------------------------------------
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
 .env
 .env.*
-!.env.example
+*.local
 
-# ---------------------------------------------------------------------------
-# Kaggle credentials
-# ---------------------------------------------------------------------------
-kaggle.json
-.kaggle/
-**/kaggle.json
+# Jupyter
+.ipynb_checkpoints/
 
-# ---------------------------------------------------------------------------
-# Logs
-# ---------------------------------------------------------------------------
-*.log
-logs/
-
-# ---------------------------------------------------------------------------
-# OS/editor files
-# ---------------------------------------------------------------------------
+# OS / editor
 .DS_Store
 Thumbs.db
-desktop.ini
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# ---------------------------------------------------------------------------
-# Dataset files
-# ---------------------------------------------------------------------------
+# Logs
+logs/
+*.log
+
+# Backups / temporary files
+*.bak
+*.bak*
+*.tmp
+*.temp
+
+# Data
 data/raw/
 data/processed/
-data/interim/
 data/external/
-data/**/*.zip
-data/**/*.tar
-data/**/*.tar.gz
-data/**/*.tgz
-data/**/*.7z
-data/**/*.jpg
-data/**/*.jpeg
-data/**/*.png
-data/**/*.txt
-data/**/*.json
-data/**/*.yaml
-data/**/*.yml
+*.zip
+*.tar
+*.tar.gz
+*.7z
 
-# Keep source scripts inside data/
-!data/*.py
-!data/README.md
-
-# ---------------------------------------------------------------------------
-# MLflow and experiment outputs
-# ---------------------------------------------------------------------------
-mlruns/
-mlartifacts/
+# Training / evaluation outputs
 runs/
-wandb/
+mlruns/
+mlflow.db
 
-# ---------------------------------------------------------------------------
-# Model checkpoints and exported models
-# ---------------------------------------------------------------------------
-models/
-weights/
-checkpoints/
+# Model artifact directories
+models/onnx/
+models/engine/
+models/ort_trt_cache/
+
+# Model artifact files
+models/**/*.onnx
+models/**/*.engine
+models/**/*.plan
+models/**/*.trt
+models/**/*.cache
+models/**/*.json
+
+# Large model checkpoints / weights
 *.pt
 *.pth
 *.ckpt
-*.onnx
-*.engine
-*.tflite
-*.mlmodel
-*.bin
+*.safetensors
 
-# ---------------------------------------------------------------------------
-# Generated predictions, reports, and benchmark artifacts
-# ---------------------------------------------------------------------------
-outputs/
-predictions/
-artifacts/
-reports/
-benchmarks/
-*.jsonl
-
-# ---------------------------------------------------------------------------
-# CMake / C++ build outputs
-# ---------------------------------------------------------------------------
-build/
-cmake-build-*/
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-compile_commands.json
-CTestTestfile.cmake
-Testing/
-
-# ---------------------------------------------------------------------------
-# Native binaries and object files
-# ---------------------------------------------------------------------------
-*.o
-*.obj
-*.a
-*.lib
-*.dll
-*.dylib
-*.so
-*.exe
-*.out
-*.app
-
-# ---------------------------------------------------------------------------
-# Profiling / debugging outputs
-# ---------------------------------------------------------------------------
-*.prof
-*.profraw
-*.profdata
-*.gcda
-*.gcno
-gmon.out
-callgrind.out.*
-massif.out.*
-perf.data
-perf.data.old
-
-# ---------------------------------------------------------------------------
-# Docker / local runtime clutter
-# ---------------------------------------------------------------------------
-.docker/
-docker-compose.override.yml
-
-# ---------------------------------------------------------------------------
-# Temporary files
-# ---------------------------------------------------------------------------
-tmp/
-temp/
-*.tmp
-*.bak
-*.old
+# Prediction/evaluation generated artifacts
+predictions.json
+evaluation_summary.json
+artifact_reports.json
+parity_details.json

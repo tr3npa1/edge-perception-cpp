@@ -4,7 +4,7 @@ Evaluate YOLO26M checkpoints and exported deployment artifacts.
 This script is the evaluation entrypoint for edge-perception-cpp.
 
 Expected PyTorch model input:
-    runs/detect/runs/train/<run_name>/weights/best.pt
+    runs/train/yolo26m_bdd100k/weights/best.pt
 
 Expected dataset input:
     data/processed/bdd100k_yolo/bdd100k.yaml
@@ -23,6 +23,7 @@ Responsibilities:
 - optionally evaluate native TensorRT engine artifacts with Ultralytics validation
 - report mAP@50, mAP@75, mAP@50-95, precision, recall, and per-class metrics
 - optionally check ONNX Runtime CPU/CUDA/TensorRT Execution Provider session readiness
+- explicitly skip the known unsupported ONNX INT8 QDQ + ORT TensorRT EP combination
 - optionally compare final detections from PyTorch against ONNX and TensorRT artifacts
 - log evaluation parameters, metrics, checks, parity results, and JSON artifacts to MLflow
 - save local JSON summaries for all evaluations, backend checks, and parity checks
@@ -62,6 +63,13 @@ DEFAULT_ORT_TRT_CACHE_DIR = Path("models/ort_trt_cache")
 
 KAGGLE_PATH_MARKER = "/kaggle/input"
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+ORT_TRT_INT8_QDQ_SKIP_REASON = (
+    "skipped_unsupported_combo: ONNX INT8 QDQ artifacts exported through ONNX "
+    "Runtime static quantization are evaluated with ORT CPU/CUDA, but are not "
+    "checked with ORT TensorRT EP for this YOLO26M graph. TensorRT INT8 is "
+    "evaluated through native .engine artifacts instead."
+)
 
 
 @dataclass(frozen=True)
@@ -1195,6 +1203,13 @@ def check_ort_backend(
         import onnxruntime as ort
 
         _ = np
+
+        if hasattr(ort, "preload_dlls"):
+            try:
+                ort.preload_dlls()
+            except Exception as preload_error:
+                LOGGER.warning("ONNX Runtime DLL preload failed: %s", preload_error)
+
         available_providers = ort.get_available_providers()
         required_provider = required_provider_name(backend)
 
@@ -1221,6 +1236,27 @@ def check_ort_backend(
             str(onnx_path),
             providers=provider_request,
         )
+
+        actual_providers = session.get_providers()
+
+        if required_provider not in actual_providers:
+            return OrtBackendCheck(
+                label=label,
+                onnx_path=str(onnx_path),
+                backend=backend,
+                provider_request=provider_request,
+                success=False,
+                available_providers=available_providers,
+                actual_providers=actual_providers,
+                inputs=None,
+                outputs=None,
+                dummy_inference=None,
+                seconds=time.time() - start_time,
+                error=(
+                    f"{required_provider} was requested but ONNX Runtime fell back to "
+                    f"{actual_providers}."
+                ),
+            )
 
         inputs = [
             {
@@ -1272,7 +1308,7 @@ def check_ort_backend(
             provider_request=provider_request,
             success=True,
             available_providers=available_providers,
-            actual_providers=session.get_providers(),
+            actual_providers=actual_providers,
             inputs=inputs,
             outputs=outputs,
             dummy_inference=dummy_inference,
@@ -1322,6 +1358,40 @@ def requested_ort_backends(args: argparse.Namespace) -> list[str]:
     return backends
 
 
+def is_int8_onnx_artifact(onnx_path: Path) -> bool:
+    """Return True when an ONNX artifact name represents the INT8 QDQ export."""
+
+    stem = onnx_path.stem.lower()
+    return "int8" in stem
+
+
+def skipped_ort_backend_check(
+    *,
+    label: str,
+    onnx_path: Path,
+    backend: str,
+    cache_dir: Path,
+) -> OrtBackendCheck:
+    """Create a successful-but-skipped ORT backend check entry."""
+
+    return OrtBackendCheck(
+        label=label,
+        onnx_path=str(onnx_path),
+        backend=backend,
+        provider_request=build_provider_request(backend=backend, cache_dir=cache_dir),
+        success=True,
+        available_providers=None,
+        actual_providers=None,
+        inputs=None,
+        outputs=None,
+        dummy_inference={
+            "skipped": True,
+            "reason": ORT_TRT_INT8_QDQ_SKIP_REASON,
+        },
+        seconds=0.0,
+        error=ORT_TRT_INT8_QDQ_SKIP_REASON,
+    )
+
 def run_ort_backend_checks(
     *,
     label: str,
@@ -1333,6 +1403,24 @@ def run_ort_backend_checks(
     checks: list[OrtBackendCheck] = []
 
     for backend in requested_ort_backends(args):
+        if backend == "ort_tensorrt" and is_int8_onnx_artifact(onnx_path):
+            LOGGER.warning(
+                "Skipping %s for %s: %s",
+                backend,
+                onnx_path,
+                ORT_TRT_INT8_QDQ_SKIP_REASON,
+            )
+
+            checks.append(
+                skipped_ort_backend_check(
+                    label=label,
+                    onnx_path=onnx_path,
+                    backend=backend,
+                    cache_dir=args.ort_tensorrt_cache_dir,
+                )
+            )
+            continue
+
         LOGGER.info("Checking %s for %s", backend, onnx_path)
 
         check = check_ort_backend(
@@ -2154,7 +2242,8 @@ def log_ort_checks_to_mlflow(
         safe_mlflow_log_metric(mlflow, f"{check_prefix}/seconds", check.seconds)
 
         if check.error:
-            safe_mlflow_log_param(mlflow, f"{check_prefix}/error", check.error)
+            key = "skip_reason" if check.success and check.error.startswith("skipped_") else "error"
+            safe_mlflow_log_param(mlflow, f"{check_prefix}/{key}", check.error)
 
         if check.available_providers is not None:
             safe_mlflow_log_param(
@@ -2265,7 +2354,9 @@ def log_summary_to_mlflow(
         try:
             mlflow.log_artifacts(str(output_dir), artifact_path="evaluation_outputs")
         except Exception as error:
-            LOGGER.warning("Failed to log evaluation output directory to MLflow: %s", error)
+            raise RuntimeError(
+                f"Failed to log evaluation output directory to MLflow: {error}"
+            ) from error
 
 
 def end_mlflow_run(mlflow: Any | None, status: str) -> None:
@@ -2519,3 +2610,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

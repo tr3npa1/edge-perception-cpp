@@ -12,8 +12,9 @@ Expected dataset input for INT8 calibration:
 Responsibilities:
 - export base ONNX FP32
 - export base ONNX FP16
-- export base ONNX INT8/PTQ when supported
+- export ONNX INT8/PTQ QDQ artifacts for ONNX Runtime CPU/CUDA validation
 - record ONNX Runtime CPU/CUDA/TensorRT-EP backend metadata for ONNX artifacts
+- document that ONNX INT8 QDQ + ORT TensorRT EP is skipped for this YOLO26M graph
 - export native TensorRT FP32 engine
 - export native TensorRT FP16 engine
 - export native TensorRT INT8 engine with calibration data
@@ -57,6 +58,13 @@ DEFAULT_ORT_TRT_CACHE_DIR = Path("models/ort_trt_cache")
 DEFAULT_BASENAME = "yolo26m_bdd100k"
 
 KAGGLE_PATH_MARKER = "/kaggle/input"
+
+ORT_TRT_INT8_QDQ_SKIP_REASON = (
+    "skipped_unsupported_combo: ONNX INT8 QDQ artifacts are intended for ONNX "
+    "Runtime CPU/CUDA checks in this project. ORT TensorRT EP INT8 is skipped "
+    "for this YOLO26M graph; native TensorRT .engine artifacts are the supported "
+    "TensorRT INT8 deployment path."
+)
 
 ONNX_VARIANTS = ("onnx_fp32", "onnx_fp16", "onnx_int8")
 ENGINE_VARIANTS = ("engine_fp32", "engine_fp16", "engine_int8")
@@ -1055,6 +1063,12 @@ def build_provider_request(
     raise ValueError(f"Unsupported ONNX Runtime provider: {provider_name}")
 
 
+def is_int8_onnx_artifact(onnx_path: Path) -> bool:
+    """Return True when an ONNX artifact name represents the INT8 QDQ export."""
+
+    return "int8" in onnx_path.stem.lower()
+
+
 def inspect_ort_session(
     *,
     onnx_path: Path,
@@ -1132,17 +1146,20 @@ def build_backend_profiles(
     """
     Build backend metadata for ONNX Runtime deployment paths.
 
-    The same ONNX model can be loaded by:
+    The same FP32/FP16 ONNX model can be loaded by:
         - CPUExecutionProvider
         - CUDAExecutionProvider
         - TensorrtExecutionProvider
 
-    TensorRT EP may build/cache TensorRT engines internally at runtime.
+    ONNX INT8 QDQ artifacts are intentionally not checked with ORT TensorRT EP
+    in this project. Native TensorRT INT8 .engine artifacts are the supported
+    TensorRT INT8 path.
     """
 
     import onnxruntime as ort
 
     available_providers = ort.get_available_providers()
+    is_int8_qdq = is_int8_onnx_artifact(onnx_path)
 
     profiles: dict[str, Any] = {
         "ort_cpu": {
@@ -1170,8 +1187,10 @@ def build_backend_profiles(
             "check_error": None,
             "engine_cache_enable": True,
             "engine_cache_path": str(args.ort_tensorrt_cache_dir),
+            "skipped": False,
+            "skip_reason": None,
             "note": (
-                "ONNX Runtime TensorRT EP consumes this ONNX file and may build/cache "
+                "ONNX Runtime TensorRT EP consumes an ONNX file and may build/cache "
                 "TensorRT engines internally at runtime. This is separate from native "
                 ".engine export."
             ),
@@ -1192,6 +1211,17 @@ def build_backend_profiles(
 
     for profile_name, should_check in requested_checks.items():
         if not should_check:
+            continue
+
+        if profile_name == "ort_tensorrt" and is_int8_qdq:
+            profiles[profile_name]["checked"] = True
+            profiles[profile_name]["check_passed"] = True
+            profiles[profile_name]["skipped"] = True
+            profiles[profile_name]["skip_reason"] = ORT_TRT_INT8_QDQ_SKIP_REASON
+            profiles[profile_name]["note"] = (
+                "Skipped by design. Use native TensorRT INT8 .engine artifacts for "
+                "TensorRT INT8 deployment."
+            )
             continue
 
         provider_name = provider_names[profile_name]
@@ -1227,6 +1257,13 @@ def build_backend_profiles(
                 imgsz=args.imgsz,
             )
 
+            actual_providers = session_info.get("actual_providers", [])
+            if provider_name not in actual_providers:
+                raise RuntimeError(
+                    f"{provider_name} was requested but ONNX Runtime fell back to "
+                    f"{actual_providers}."
+                )
+
             profiles[profile_name]["check_passed"] = True
             profiles[profile_name]["session"] = session_info
         except Exception as error:
@@ -1259,9 +1296,9 @@ def inspect_onnx_artifact(
         onnxruntime_info = {
             "available_profiles": backend_profiles,
             "note": (
-                "Use this ONNX artifact with ONNX Runtime CPU, CUDA, or TensorRT EP. "
-                "TensorRT EP does not require a separate ONNX export; it changes the "
-                "runtime execution provider."
+                "Use FP32/FP16 ONNX artifacts with ORT CPU, ORT CUDA, or ORT TensorRT EP. "
+                "Use ONNX INT8 QDQ artifacts with ORT CPU/CUDA. For TensorRT INT8, use "
+                "the native .engine artifacts exported by this script."
             ),
         }
 
@@ -1392,19 +1429,111 @@ def get_onnx_first_input_name(onnx_path: Path) -> str:
     return model.graph.input[0].name
 
 
+def build_convonly_int8_exclusion_list(fp32_onnx_path: Path) -> list[str]:
+    """
+    Build a conservative exclusion list for ONNX INT8 QDQ quantization.
+
+    The exported YOLO26M ONNX graph produces final detections directly as:
+
+        [1, 300, 6] = [x1, y1, x2, y2, confidence, class_id]
+
+    Quantizing the final detection/output path can corrupt confidence and class
+    columns because the same output tensor mixes very different numeric ranges.
+    Therefore, this INT8 mode quantizes Conv nodes in the feature extractor/body
+    but excludes the final YOLO detection head around model.23.
+    """
+
+    import onnx
+
+    model = onnx.load(str(fp32_onnx_path))
+
+    excluded: list[str] = []
+    total_conv_nodes = 0
+    excluded_conv_nodes = 0
+
+    fragile_name_markers = (
+        "/model.23",
+        "model.23",
+        "one2one",
+        "cv2.",
+        "cv3.",
+    )
+
+    fragile_op_types = {
+        "TopK",
+        "Gather",
+        "GatherElements",
+        "Tile",
+        "Expand",
+        "Mod",
+        "NonMaxSuppression",
+    }
+
+    for node in model.graph.node:
+        node_name = node.name or ""
+
+        is_fragile_name = any(marker in node_name for marker in fragile_name_markers)
+        is_fragile_op = node.op_type in fragile_op_types
+
+        if node.op_type == "Conv":
+            total_conv_nodes += 1
+
+        if is_fragile_name or is_fragile_op:
+            excluded.append(node_name)
+
+            if node.op_type == "Conv":
+                excluded_conv_nodes += 1
+
+    excluded = sorted(set(name for name in excluded if name))
+
+    LOGGER.info("ONNX INT8 conservative exclusion summary:")
+    LOGGER.info("  total Conv nodes: %d", total_conv_nodes)
+    LOGGER.info("  excluded nodes: %d", len(excluded))
+    LOGGER.info("  excluded Conv nodes: %d", excluded_conv_nodes)
+    LOGGER.info("  quantized Conv nodes approx: %d", total_conv_nodes - excluded_conv_nodes)
+
+    if excluded[:10]:
+        LOGGER.info("  first excluded nodes: %s", excluded[:10])
+
+    return excluded
+
+
 def export_onnx_int8_via_ort(
     *,
     fp32_onnx_path: Path,
     int8_onnx_path: Path,
     args: argparse.Namespace,
 ) -> None:
-    """Create an ONNX INT8 artifact with ONNX Runtime static QDQ quantization."""
+    """
+    Create an all-Conv ONNX INT8 QDQ artifact with ONNX Runtime static quantization.
 
-    from onnxruntime.quantization import CalibrationMethod, QuantFormat, QuantType, quantize_static
+    This mode quantizes every Conv node that ONNX Runtime can quantize.
 
-    LOGGER.info("Creating ONNX INT8 using ONNX Runtime static QDQ quantization:")
+    Still intentionally not quantized:
+    - non-Conv ops such as TopK/Gather/Reshape/Concat/etc.
+    - final detection/output formatting logic if it is implemented through non-Conv ops.
+    - bias tensors, via QuantizeBias=False.
+
+    This is not full-graph INT8. It is all-Conv INT8.
+    """
+
+    from onnxruntime.quantization import (
+        CalibrationMethod,
+        QuantFormat,
+        QuantType,
+        quantize_static,
+    )
+
+    LOGGER.info("Creating ALL-CONV ONNX INT8 using ONNX Runtime static QDQ quantization:")
     LOGGER.info("  source: %s", fp32_onnx_path)
     LOGGER.info("  target: %s", int8_onnx_path)
+    LOGGER.info("  mode: all Conv nodes, no Conv exclusion list")
+    LOGGER.info("  op_types_to_quantize: Conv")
+    LOGGER.info("  nodes_to_exclude: []")
+    LOGGER.info("  activation_type: QInt8")
+    LOGGER.info("  weight_type: QInt8")
+    LOGGER.info("  per_channel: True")
+    LOGGER.info("  QuantizeBias: False")
 
     image_paths = collect_calibration_images(
         data_yaml=args.data,
@@ -1421,6 +1550,7 @@ def export_onnx_int8_via_ort(
     )
 
     int8_onnx_path.parent.mkdir(parents=True, exist_ok=True)
+
     quantize_static(
         model_input=str(fp32_onnx_path),
         model_output=str(int8_onnx_path),
@@ -1429,7 +1559,12 @@ def export_onnx_int8_via_ort(
         activation_type=QuantType.QInt8,
         weight_type=QuantType.QInt8,
         calibrate_method=CalibrationMethod.MinMax,
+        op_types_to_quantize=["Conv"],
+        nodes_to_exclude=[],
         per_channel=True,
+        extra_options={
+            "QuantizeBias": False,
+        },
     )
 
 
@@ -1917,7 +2052,9 @@ def export_one_variant(
 
     if variant == "onnx_int8":
         # Ultralytics currently rejects int8=True for format='onnx' in this stack.
-        # Create a real ONNX INT8 QDQ artifact from the FP32 ONNX instead.
+        # Create a real ONNX Runtime QDQ INT8 artifact from the FP32 ONNX instead.
+        # This ONNX INT8 file is checked with ORT CPU/CUDA; TensorRT INT8 uses
+        # native .engine export.
         fp32_onnx_path = variant_output_path(args, "onnx_fp32")
         if not fp32_onnx_path.is_file():
             LOGGER.info("ONNX FP32 source missing; exporting onnx_fp32 before ONNX INT8.")

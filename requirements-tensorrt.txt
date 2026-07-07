@@ -1,0 +1,5 @@
+--extra-index-url https://pypi.nvidia.com
+
+# Optional dependency group for TensorRT export / engine loading.
+# Install this only in environments where native TensorRT artifacts are needed.
+tensorrt
