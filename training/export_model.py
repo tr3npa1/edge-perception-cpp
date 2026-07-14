@@ -4,7 +4,7 @@ Export YOLO26M PyTorch checkpoints to ONNX and TensorRT deployment artifacts.
 This script is the export entrypoint for edge-perception-cpp.
 
 Expected PyTorch model input:
-    runs/detect/runs/train/<run_name>/weights/best.pt
+    runs/tain/yolo26m_bdd100k/weights/best.pt
 
 Expected dataset input for INT8 calibration:
     data/processed/bdd100k_yolo/bdd100k.yaml
@@ -36,7 +36,6 @@ import argparse
 import json
 import logging
 import math
-import os
 import shutil
 import subprocess
 import sys
@@ -1429,75 +1428,6 @@ def get_onnx_first_input_name(onnx_path: Path) -> str:
     return model.graph.input[0].name
 
 
-def build_convonly_int8_exclusion_list(fp32_onnx_path: Path) -> list[str]:
-    """
-    Build a conservative exclusion list for ONNX INT8 QDQ quantization.
-
-    The exported YOLO26M ONNX graph produces final detections directly as:
-
-        [1, 300, 6] = [x1, y1, x2, y2, confidence, class_id]
-
-    Quantizing the final detection/output path can corrupt confidence and class
-    columns because the same output tensor mixes very different numeric ranges.
-    Therefore, this INT8 mode quantizes Conv nodes in the feature extractor/body
-    but excludes the final YOLO detection head around model.23.
-    """
-
-    import onnx
-
-    model = onnx.load(str(fp32_onnx_path))
-
-    excluded: list[str] = []
-    total_conv_nodes = 0
-    excluded_conv_nodes = 0
-
-    fragile_name_markers = (
-        "/model.23",
-        "model.23",
-        "one2one",
-        "cv2.",
-        "cv3.",
-    )
-
-    fragile_op_types = {
-        "TopK",
-        "Gather",
-        "GatherElements",
-        "Tile",
-        "Expand",
-        "Mod",
-        "NonMaxSuppression",
-    }
-
-    for node in model.graph.node:
-        node_name = node.name or ""
-
-        is_fragile_name = any(marker in node_name for marker in fragile_name_markers)
-        is_fragile_op = node.op_type in fragile_op_types
-
-        if node.op_type == "Conv":
-            total_conv_nodes += 1
-
-        if is_fragile_name or is_fragile_op:
-            excluded.append(node_name)
-
-            if node.op_type == "Conv":
-                excluded_conv_nodes += 1
-
-    excluded = sorted(set(name for name in excluded if name))
-
-    LOGGER.info("ONNX INT8 conservative exclusion summary:")
-    LOGGER.info("  total Conv nodes: %d", total_conv_nodes)
-    LOGGER.info("  excluded nodes: %d", len(excluded))
-    LOGGER.info("  excluded Conv nodes: %d", excluded_conv_nodes)
-    LOGGER.info("  quantized Conv nodes approx: %d", total_conv_nodes - excluded_conv_nodes)
-
-    if excluded[:10]:
-        LOGGER.info("  first excluded nodes: %s", excluded[:10])
-
-    return excluded
-
-
 def export_onnx_int8_via_ort(
     *,
     fp32_onnx_path: Path,
@@ -1847,8 +1777,7 @@ def export_engine_via_python_tensorrt(
         raise RuntimeError(
             "TensorRT Python bindings are not installed in this environment. "
             "This is expected for the default local development setup. Native "
-            "TensorRT engine export requires a properly configured NVIDIA "
-            "TensorRT environment, usually on the GPU export server. "
+            "TensorRT engine export requires a properly configured NVIDIA TensorRT environment "
             "Either install TensorRT separately for your platform or use trtexec "
             "if it is available on PATH."
         ) from error
@@ -2164,6 +2093,7 @@ def export_one_variant(
         backend_profiles=backend_profiles,
         engine_info=engine_info,
     )
+
 
 def log_export_artifact(artifact: ExportArtifact) -> None:
     """Log one exported artifact summary."""

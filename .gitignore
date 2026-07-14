@@ -47,6 +47,7 @@ data/external/
 *.7z
 
 # Training / evaluation outputs
+mlartifacts/
 runs/
 mlruns/
 mlflow.db

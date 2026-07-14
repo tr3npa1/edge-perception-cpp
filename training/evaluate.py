@@ -1202,8 +1202,6 @@ def check_ort_backend(
         import numpy as np
         import onnxruntime as ort
 
-        _ = np
-
         if hasattr(ort, "preload_dlls"):
             try:
                 ort.preload_dlls()
@@ -1391,6 +1389,7 @@ def skipped_ort_backend_check(
         seconds=0.0,
         error=ORT_TRT_INT8_QDQ_SKIP_REASON,
     )
+
 
 def run_ort_backend_checks(
     *,
@@ -1887,7 +1886,9 @@ def run_final_detection_parity(
 def validate_required_paths(args: argparse.Namespace) -> None:
     """Validate input paths."""
 
-    if not args.weights.is_file():
+    requires_weights = args.eval_pytroch or args.parity
+
+    if requires_weights and not args.weights.is_file():
         raise FileNotFoundError(f"Weights file not found: {args.weights}")
 
     if not args.data.is_file():
@@ -2610,5 +2611,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
