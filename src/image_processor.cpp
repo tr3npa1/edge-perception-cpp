@@ -135,6 +135,22 @@ constexpr std::size_t kUint8ValueCount = 256U;
 }
 
 /**
+ * @brief Check whether a conversion execution-policy enum value is supported.
+ */
+[[nodiscard]] bool is_supported_execution_policy(
+    PreprocessExecutionPolicy policy
+) noexcept {
+    switch (policy) {
+        case PreprocessExecutionPolicy::Automatic:
+        case PreprocessExecutionPolicy::Serial:
+        case PreprocessExecutionPolicy::OpenCvParallel:
+            return true;
+    }
+
+    return false;
+}
+
+/**
  * @brief Check whether a destination tensor element type is supported.
  */
 [[nodiscard]] bool is_supported_tensor_type(
@@ -210,14 +226,18 @@ void write_nchw_from_lookup(
         std::array<Scalar, kUint8ValueCount>,
         kChannelCount
     >& lookup,
+    PreprocessExecutionPolicy execution_policy,
+    std::size_t parallel_minimum_pixels,
     Scalar* destination
 ) {
     const int width = letterboxed_bgr.cols;
     const int height = letterboxed_bgr.rows;
 
+    const std::size_t width_size =
+        static_cast<std::size_t>(width);
+
     const std::size_t plane_size =
-        static_cast<std::size_t>(width)
-        * static_cast<std::size_t>(height);
+        width_size * static_cast<std::size_t>(height);
 
     Scalar* const output_plane_0 = destination;
     Scalar* const output_plane_1 = destination + plane_size;
@@ -235,36 +255,74 @@ void write_nchw_from_lookup(
         source_channel_for_output[2]
     );
 
-    for (int row_index = 0; row_index < height; ++row_index) {
-        const cv::Vec3b* const source_row =
-            letterboxed_bgr.ptr<cv::Vec3b>(row_index);
+    const auto write_rows = [&](const cv::Range& row_range) {
+        for (
+            int row_index = row_range.start;
+            row_index < row_range.end;
+            ++row_index
+        ) {
+            const cv::Vec3b* const source_row =
+                letterboxed_bgr.ptr<cv::Vec3b>(row_index);
 
-        const std::size_t row_offset =
-            static_cast<std::size_t>(row_index)
-            * static_cast<std::size_t>(width);
+            const std::size_t row_offset =
+                static_cast<std::size_t>(row_index) * width_size;
 
-        for (int column_index = 0; column_index < width; ++column_index) {
-            const cv::Vec3b& pixel = source_row[column_index];
+            Scalar* const row_plane_0 =
+                output_plane_0 + row_offset;
 
-            const std::size_t destination_index =
-                row_offset + static_cast<std::size_t>(column_index);
+            Scalar* const row_plane_1 =
+                output_plane_1 + row_offset;
 
-            const std::size_t value_0 = static_cast<std::size_t>(
-                pixel[source_channel_0]
-            );
+            Scalar* const row_plane_2 =
+                output_plane_2 + row_offset;
 
-            const std::size_t value_1 = static_cast<std::size_t>(
-                pixel[source_channel_1]
-            );
+            for (
+                int column_index = 0;
+                column_index < width;
+                ++column_index
+            ) {
+                const cv::Vec3b& pixel =
+                    source_row[column_index];
 
-            const std::size_t value_2 = static_cast<std::size_t>(
-                pixel[source_channel_2]
-            );
+                const std::size_t column =
+                    static_cast<std::size_t>(column_index);
 
-            output_plane_0[destination_index] = lookup[0][value_0];
-            output_plane_1[destination_index] = lookup[1][value_1];
-            output_plane_2[destination_index] = lookup[2][value_2];
+                row_plane_0[column] = lookup[0][
+                    static_cast<std::size_t>(
+                        pixel[source_channel_0]
+                    )
+                ];
+
+                row_plane_1[column] = lookup[1][
+                    static_cast<std::size_t>(
+                        pixel[source_channel_1]
+                    )
+                ];
+
+                row_plane_2[column] = lookup[2][
+                    static_cast<std::size_t>(
+                        pixel[source_channel_2]
+                    )
+                ];
+            }
         }
+    };
+
+    const bool use_parallel_conversion =
+        execution_policy == PreprocessExecutionPolicy::OpenCvParallel
+        || (
+            execution_policy == PreprocessExecutionPolicy::Automatic
+            && plane_size >= parallel_minimum_pixels
+            && cv::getNumThreads() > 1
+        );
+
+    if (use_parallel_conversion) {
+        cv::parallel_for_(
+            cv::Range{0, height},
+            write_rows
+        );
+    } else {
+        write_rows(cv::Range{0, height});
     }
 }
 
@@ -289,6 +347,18 @@ void PreprocessConfig::validate() const {
     if (!is_supported_interpolation(interpolation)) {
         throw std::invalid_argument(
             "PreprocessConfig.interpolation is invalid."
+        );
+    }
+
+    if (!is_supported_execution_policy(execution_policy)) {
+        throw std::invalid_argument(
+            "PreprocessConfig.execution_policy is invalid."
+        );
+    }
+
+    if (parallel_minimum_pixels == 0U) {
+        throw std::invalid_argument(
+            "PreprocessConfig.parallel_minimum_pixels must be positive."
         );
     }
 
@@ -605,14 +675,32 @@ void ImageProcessor::release_workspace() noexcept {
 /**
  * @brief Reproduce Ultralytics letterbox resize and padding calculations.
  */
-LetterboxTransform ImageProcessor::compute_letterbox_transform(
-    const cv::Mat& bgr_image
-) const {
-    const int original_width = bgr_image.cols;
-    const int original_height = bgr_image.rows;
+LetterboxTransform ImageProcessor::calculate_letterbox_transform(
+    ImageSize source_size,
+    const PreprocessConfig& config
+) {
+    config.validate();
+    return calculate_letterbox_transform_unchecked(source_size, config);
+}
 
-    const int network_width = config_.network_size.width;
-    const int network_height = config_.network_size.height;
+/**
+ * @brief Calculate letterbox geometry for a configuration validated earlier.
+ */
+LetterboxTransform ImageProcessor::calculate_letterbox_transform_unchecked(
+    ImageSize source_size,
+    const PreprocessConfig& config
+) {
+    if (!source_size.valid()) {
+        throw std::invalid_argument(
+            "Letterbox source dimensions must be strictly positive."
+        );
+    }
+
+    const int original_width = source_size.width;
+    const int original_height = source_size.height;
+
+    const int network_width = config.network_size.width;
+    const int network_height = config.network_size.height;
 
     const double width_scale =
         static_cast<double>(network_width)
@@ -627,7 +715,7 @@ LetterboxTransform ImageProcessor::compute_letterbox_transform(
         height_scale
     );
 
-    if (!config_.allow_scale_up) {
+    if (!config.allow_scale_up) {
         resize_ratio = std::min(resize_ratio, 1.0);
     }
 
@@ -658,18 +746,18 @@ LetterboxTransform ImageProcessor::compute_letterbox_transform(
         network_height - resized_height
     );
 
-    if (config_.center_letterbox) {
+    if (config.center_letterbox) {
         horizontal_padding /= 2.0;
         vertical_padding /= 2.0;
     }
 
     // The ±0.1 convention is intentionally identical to Ultralytics. It
     // deterministically assigns the extra pixel when total padding is odd.
-    const int pad_left = config_.center_letterbox
+    const int pad_left = config.center_letterbox
         ? python_round_to_int(horizontal_padding - 0.1)
         : 0;
 
-    const int pad_top = config_.center_letterbox
+    const int pad_top = config.center_letterbox
         ? python_round_to_int(vertical_padding - 0.1)
         : 0;
 
@@ -696,6 +784,18 @@ LetterboxTransform ImageProcessor::compute_letterbox_transform(
         pad_right,
         pad_bottom
     };
+}
+
+/**
+ * @brief Calculate letterbox geometry using the processor's active config.
+ */
+LetterboxTransform ImageProcessor::compute_letterbox_transform(
+    const cv::Mat& bgr_image
+) const {
+    return calculate_letterbox_transform_unchecked(
+        ImageSize{bgr_image.cols, bgr_image.rows},
+        config_
+    );
 }
 
 /**
@@ -743,20 +843,58 @@ void ImageProcessor::prepare_letterboxed_bgr(
         CV_8UC3
     );
 
-    const bool padding_required =
-        transform.pad_left != 0
-        || transform.pad_top != 0
-        || transform.pad_right != 0
-        || transform.pad_bottom != 0;
+    const cv::Scalar padding_value{
+        static_cast<double>(config_.padding_bgr[0]),
+        static_cast<double>(config_.padding_bgr[1]),
+        static_cast<double>(config_.padding_bgr[2])
+    };
 
-    if (padding_required) {
-        letterboxed_bgr_.setTo(
-            cv::Scalar{
-                static_cast<double>(config_.padding_bgr[0]),
-                static_cast<double>(config_.padding_bgr[1]),
-                static_cast<double>(config_.padding_bgr[2])
+    // Fill only the border bands. Filling the entire destination first would
+    // write every pixel in the resized ROI twice: once with padding and once
+    // again during resize. The four non-overlapping bands below preserve exact
+    // letterbox pixels while reducing memory traffic on the hot path.
+    if (transform.pad_top > 0) {
+        letterboxed_bgr_(
+            cv::Rect{
+                0,
+                0,
+                transform.network_size.width,
+                transform.pad_top
             }
-        );
+        ).setTo(padding_value);
+    }
+
+    if (transform.pad_bottom > 0) {
+        letterboxed_bgr_(
+            cv::Rect{
+                0,
+                transform.pad_top + transform.resized_size.height,
+                transform.network_size.width,
+                transform.pad_bottom
+            }
+        ).setTo(padding_value);
+    }
+
+    if (transform.pad_left > 0) {
+        letterboxed_bgr_(
+            cv::Rect{
+                0,
+                transform.pad_top,
+                transform.pad_left,
+                transform.resized_size.height
+            }
+        ).setTo(padding_value);
+    }
+
+    if (transform.pad_right > 0) {
+        letterboxed_bgr_(
+            cv::Rect{
+                transform.pad_left + transform.resized_size.width,
+                transform.pad_top,
+                transform.pad_right,
+                transform.resized_size.height
+            }
+        ).setTo(padding_value);
     }
 
     const cv::Rect resized_region{
@@ -806,6 +944,8 @@ void ImageProcessor::write_nchw_float32(
         letterboxed_bgr_,
         source_channel_for_output_,
         float32_lookup_,
+        config_.execution_policy,
+        config_.parallel_minimum_pixels,
         destination
     );
 }
@@ -820,6 +960,8 @@ void ImageProcessor::write_nchw_float16(
         letterboxed_bgr_,
         source_channel_for_output_,
         float16_lookup_,
+        config_.execution_policy,
+        config_.parallel_minimum_pixels,
         destination
     );
 }

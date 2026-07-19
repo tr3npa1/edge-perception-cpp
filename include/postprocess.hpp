@@ -209,6 +209,10 @@ struct PostprocessConfig {
     bool clip_boxes = true;
     bool discard_degenerate_boxes = true;
 
+    // YOLO26 end-to-end output is TopK-ranked by descending confidence. When
+    // true, process() stops at the first row that does not pass the threshold.
+    bool output_sorted_by_confidence = true;
+
     float class_id_tolerance = 1.0e-3F;
 
     MalformedCandidatePolicy malformed_candidate_policy =
@@ -291,8 +295,56 @@ public:
     }
 
     /**
+     * @brief Replace the logical contents from contiguous detection storage.
+     *
+     * This remains allocation-free and is primarily used by the optional
+     * fused CUDA postprocessor after its compact result has been copied back
+     * to host memory. A null source is accepted only when count is zero.
+     *
+     * @return False when count exceeds capacity or source is null for a
+     *         non-empty assignment. On failure the existing contents remain
+     *         unchanged.
+     */
+    [[nodiscard]] constexpr bool assign(
+        const Detection* source,
+        size_type count
+    ) noexcept {
+        if (count > storage_.size() || (count != 0U && source == nullptr)) {
+            return false;
+        }
+
+        for (size_type index = 0U; index < count; ++index) {
+            storage_[index] = source[index];
+        }
+
+        size_ = count;
+        return true;
+    }
+
+    /**
      * @brief Return a pointer to the first storage element.
      */
+    /**
+     * @brief Set the logical size and expose storage for direct overwrite.
+     *
+     * This avoids an intermediate fixed-size array when a backend has already
+     * produced a compact detection count. The caller must initialize exactly
+     * count elements before the buffer is observed.
+     *
+     * @return Pointer to writable storage, or nullptr when count exceeds
+     *         capacity. On failure the previous logical size is unchanged.
+     */
+    [[nodiscard]] constexpr Detection* resize_for_overwrite(
+        size_type count
+    ) noexcept {
+        if (count > storage_.size()) {
+            return nullptr;
+        }
+
+        size_ = count;
+        return storage_.data();
+    }
+
     [[nodiscard]] constexpr Detection* data() noexcept {
         return storage_.data();
     }
@@ -467,15 +519,6 @@ private:
     [[nodiscard]] bool decode_class_id(
         float class_value,
         std::int32_t& class_id
-    ) const noexcept;
-
-    /**
-     * @brief Undo letterbox padding/scaling and optionally clip the XYXY box to
-     *        original-image bounds.
-     */
-    [[nodiscard]] BoundingBox restore_box(
-        const float* candidate,
-        const LetterboxTransform& transform
     ) const noexcept;
 
     /**

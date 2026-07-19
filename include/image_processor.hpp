@@ -141,6 +141,19 @@ enum class ResizeInterpolation : std::uint8_t {
 };
 
 /**
+ * @brief CPU execution policy for the HWC-to-NCHW conversion stage.
+ *
+ * Automatic uses OpenCV's existing worker pool only when the fixed tensor is
+ * large enough to amortize scheduling overhead. Serial remains available for
+ * low-core-count systems and deterministic microbenchmark comparisons.
+ */
+enum class PreprocessExecutionPolicy : std::uint8_t {
+    Automatic,
+    Serial,
+    OpenCvParallel
+};
+
+/**
  * @brief Complete preprocessing configuration for a fixed-shape detector.
  *
  * Normalization is applied independently to each final output channel:
@@ -160,6 +173,7 @@ enum class ResizeInterpolation : std::uint8_t {
  *     padding value:  114
  *     centered:       yes
  *     scale-up:       allowed
+ *     conversion:     automatically parallelized when worthwhile
  */
 struct PreprocessConfig {
     ImageSize network_size{640, 640};
@@ -171,6 +185,11 @@ struct PreprocessConfig {
 
     ChannelOrder output_channel_order = ChannelOrder::RGB;
     ResizeInterpolation interpolation = ResizeInterpolation::Linear;
+
+    PreprocessExecutionPolicy execution_policy =
+        PreprocessExecutionPolicy::Automatic;
+
+    std::size_t parallel_minimum_pixels = 256U * 256U;
 
     float pixel_scale = 1.0F / 255.0F;
     std::array<float, 3> mean{0.0F, 0.0F, 0.0F};
@@ -367,6 +386,36 @@ public:
     );
 
     /**
+     * @brief Compute the exact Ultralytics-compatible letterbox geometry for
+     *        an image size without allocating or touching pixel storage.
+     *
+     * This shared helper is used by both the CPU ImageProcessor and the
+     * optional fused CUDA/TensorRT pipeline so both paths restore detections
+     * with identical integer resize dimensions and padding.
+     *
+     * @throws std::invalid_argument if source_size or config is invalid.
+     * @throws std::runtime_error if rounding produces impossible geometry.
+     */
+    [[nodiscard]] static LetterboxTransform calculate_letterbox_transform(
+        ImageSize source_size,
+        const PreprocessConfig& config
+    );
+
+    /**
+     * @brief Hot-path variant for a PreprocessConfig that was already validated.
+     *
+     * ImageProcessor and NativeTensorRtPipeline validate configuration during
+     * construction or set_config(), then use this overload per frame to avoid
+     * repeating invariant and overflow checks in the latency-critical path.
+     * Calling it with an unvalidated configuration is a programming error.
+     */
+    [[nodiscard]] static LetterboxTransform
+    calculate_letterbox_transform_unchecked(
+        ImageSize source_size,
+        const PreprocessConfig& validated_config
+    );
+
+    /**
      * @brief Letterbox, normalize, reorder, and write one image to NCHW.
      *
      * Source requirements:
@@ -428,7 +477,8 @@ private:
 
     /**
      * @brief Write the prepared BGR workspace directly into planar FP32 NCHW
-     *        destination memory using cached normalization values.
+     *        destination memory using cached normalization values and the
+     *        configured serial/parallel execution policy.
      */
     void write_nchw_float32(
         float* destination
@@ -436,7 +486,8 @@ private:
 
     /**
      * @brief Write the prepared BGR workspace directly into planar FP16 NCHW
-     *        destination memory using cached binary16 values.
+     *        destination memory using cached binary16 values and the configured
+     *        serial/parallel execution policy.
      */
     void write_nchw_float16(
         std::uint16_t* destination

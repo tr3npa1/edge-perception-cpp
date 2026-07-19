@@ -56,6 +56,72 @@ constexpr std::size_t kClassIdIndex = 5U;
 }
 
 /**
+ * @brief Precomputed constants used to restore every box in one output tensor.
+ *
+ * Building these values once per frame avoids repeated divisions and integer-
+ * to-float conversions for every accepted detection row.
+ */
+struct BoxRestoreParameters {
+    float inverse_scale_x = 0.0F;
+    float inverse_scale_y = 0.0F;
+
+    float x_offset = 0.0F;
+    float y_offset = 0.0F;
+
+    float maximum_x = 0.0F;
+    float maximum_y = 0.0F;
+
+    bool clip_boxes = true;
+};
+
+/**
+ * @brief Restore one XYXY row using precomputed per-frame geometry.
+ */
+[[nodiscard]] BoundingBox restore_box(
+    const float* candidate,
+    const BoxRestoreParameters& parameters
+) noexcept {
+    BoundingBox box{
+        candidate[kXMinIndex] * parameters.inverse_scale_x
+            + parameters.x_offset,
+        candidate[kYMinIndex] * parameters.inverse_scale_y
+            + parameters.y_offset,
+        candidate[kXMaxIndex] * parameters.inverse_scale_x
+            + parameters.x_offset,
+        candidate[kYMaxIndex] * parameters.inverse_scale_y
+            + parameters.y_offset
+    };
+
+    if (parameters.clip_boxes) {
+        box.x_min = std::clamp(
+            box.x_min,
+            0.0F,
+            parameters.maximum_x
+        );
+
+        box.y_min = std::clamp(
+            box.y_min,
+            0.0F,
+            parameters.maximum_y
+        );
+
+        box.x_max = std::clamp(
+            box.x_max,
+            0.0F,
+            parameters.maximum_x
+        );
+
+        box.y_max = std::clamp(
+            box.y_max,
+            0.0F,
+            parameters.maximum_y
+        );
+    }
+
+    return box;
+}
+
+/**
  * @brief Validate letterbox metadata before it is used for coordinate math.
  */
 void validate_letterbox_transform(
@@ -184,6 +250,22 @@ PostprocessSummary Postprocessor::process(
 
     PostprocessSummary summary{};
 
+    const float inverse_scale_x =
+        1.0F / transform.scale_x;
+
+    const float inverse_scale_y =
+        1.0F / transform.scale_y;
+
+    const BoxRestoreParameters restore_parameters{
+        inverse_scale_x,
+        inverse_scale_y,
+        -static_cast<float>(transform.pad_left) * inverse_scale_x,
+        -static_cast<float>(transform.pad_top) * inverse_scale_y,
+        static_cast<float>(transform.original_size.width),
+        static_cast<float>(transform.original_size.height),
+        config_.clip_boxes
+    };
+
     for (
         std::size_t candidate_index = 0U;
         candidate_index < output.candidate_count;
@@ -211,6 +293,15 @@ PostprocessSummary Postprocessor::process(
         // Ultralytics keeps end-to-end rows only when confidence is strictly
         // greater than the threshold, so equality is rejected for parity.
         if (!(confidence > config_.confidence_threshold)) {
+            if (config_.output_sorted_by_confidence) {
+                // YOLO26 end-to-end rows are emitted by descending TopK score.
+                // Every remaining row therefore fails the same threshold and
+                // can be skipped without touching its coordinates or class ID.
+                summary.rejected_by_confidence +=
+                    output.candidate_count - candidate_index;
+                break;
+            }
+
             ++summary.rejected_by_confidence;
             continue;
         }
@@ -262,7 +353,7 @@ PostprocessSummary Postprocessor::process(
         }
 
         const BoundingBox restored_box =
-            restore_box(candidate, transform);
+            restore_box(candidate, restore_parameters);
 
         // Finite network coordinates can still overflow during restoration if
         // backend output is pathologically large, so validate the result too.
@@ -412,75 +503,6 @@ bool Postprocessor::decode_class_id(
     );
 
     return true;
-}
-
-/**
- * @brief Map one XYXY box from letterboxed network space to source pixels.
- */
-BoundingBox Postprocessor::restore_box(
-    const float* candidate,
-    const LetterboxTransform& transform
-) const noexcept {
-    const float inverse_scale_x =
-        1.0F / transform.scale_x;
-
-    const float inverse_scale_y =
-        1.0F / transform.scale_y;
-
-    const float horizontal_padding =
-        static_cast<float>(transform.pad_left);
-
-    const float vertical_padding =
-        static_cast<float>(transform.pad_top);
-
-    BoundingBox box{
-        (
-            candidate[kXMinIndex] - horizontal_padding
-        ) * inverse_scale_x,
-        (
-            candidate[kYMinIndex] - vertical_padding
-        ) * inverse_scale_y,
-        (
-            candidate[kXMaxIndex] - horizontal_padding
-        ) * inverse_scale_x,
-        (
-            candidate[kYMaxIndex] - vertical_padding
-        ) * inverse_scale_y
-    };
-
-    if (config_.clip_boxes) {
-        const float maximum_x =
-            static_cast<float>(transform.original_size.width);
-
-        const float maximum_y =
-            static_cast<float>(transform.original_size.height);
-
-        box.x_min = std::clamp(
-            box.x_min,
-            0.0F,
-            maximum_x
-        );
-
-        box.y_min = std::clamp(
-            box.y_min,
-            0.0F,
-            maximum_y
-        );
-
-        box.x_max = std::clamp(
-            box.x_max,
-            0.0F,
-            maximum_x
-        );
-
-        box.y_max = std::clamp(
-            box.y_max,
-            0.0F,
-            maximum_y
-        );
-    }
-
-    return box;
 }
 
 /**
