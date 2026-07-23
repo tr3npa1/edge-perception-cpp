@@ -381,16 +381,6 @@ public:
         : data_(std::exchange(other.data_, nullptr)),
           bytes_(std::exchange(other.bytes_, 0U)) {}
 
-    PinnedBuffer& operator=(PinnedBuffer&& other) noexcept {
-        if (this != &other) {
-            release();
-            data_ = std::exchange(other.data_, nullptr);
-            bytes_ = std::exchange(other.bytes_, 0U);
-        }
-
-        return *this;
-    }
-
     void allocate(std::size_t bytes) {
         if (bytes == 0U) {
             throw std::invalid_argument("Pinned allocation cannot be empty.");
@@ -407,14 +397,6 @@ public:
 
     [[nodiscard]] void* data() noexcept {
         return data_;
-    }
-
-    [[nodiscard]] const void* data() const noexcept {
-        return data_;
-    }
-
-    [[nodiscard]] std::size_t size() const noexcept {
-        return bytes_;
     }
 
 private:
@@ -450,16 +432,6 @@ public:
         : data_(std::exchange(other.data_, nullptr)),
           bytes_(std::exchange(other.bytes_, 0U)) {}
 
-    DeviceBuffer& operator=(DeviceBuffer&& other) noexcept {
-        if (this != &other) {
-            release();
-            data_ = std::exchange(other.data_, nullptr);
-            bytes_ = std::exchange(other.bytes_, 0U);
-        }
-
-        return *this;
-    }
-
     void allocate(std::size_t bytes) {
         if (bytes == 0U) {
             throw std::invalid_argument("Device allocation cannot be empty.");
@@ -472,14 +444,6 @@ public:
 
     [[nodiscard]] void* data() noexcept {
         return data_;
-    }
-
-    [[nodiscard]] const void* data() const noexcept {
-        return data_;
-    }
-
-    [[nodiscard]] std::size_t size() const noexcept {
-        return bytes_;
     }
 
 private:
@@ -513,15 +477,6 @@ public:
 
     CudaStream(CudaStream&& other) noexcept
         : stream_(std::exchange(other.stream_, nullptr)) {}
-
-    CudaStream& operator=(CudaStream&& other) noexcept {
-        if (this != &other) {
-            release();
-            stream_ = std::exchange(other.stream_, nullptr);
-        }
-
-        return *this;
-    }
 
     void create(int device_id, bool high_priority) {
         release();
@@ -587,15 +542,6 @@ public:
 
     CudaEvent(CudaEvent&& other) noexcept
         : event_(std::exchange(other.event_, nullptr)) {}
-
-    CudaEvent& operator=(CudaEvent&& other) noexcept {
-        if (this != &other) {
-            release();
-            event_ = std::exchange(other.event_, nullptr);
-        }
-
-        return *this;
-    }
 
     void create() {
         release();

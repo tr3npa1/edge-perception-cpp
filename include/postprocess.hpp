@@ -322,9 +322,6 @@ public:
     }
 
     /**
-     * @brief Return a pointer to the first storage element.
-     */
-    /**
      * @brief Set the logical size and expose storage for direct overwrite.
      *
      * This avoids an intermediate fixed-size array when a backend has already

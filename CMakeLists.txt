@@ -99,8 +99,8 @@ endif()
 
 option(
     EDGE_BUILD_TESTS
-    "Build and register the C++ inference test executable"
-    ON
+    "Build and register the optional C++ inference test executable when present"
+    OFF
 )
 
 option(
@@ -180,6 +180,7 @@ find_package(
         core
         imgproc
         imgcodecs
+        videoio
 )
 
 # =============================================================================
@@ -322,6 +323,7 @@ if(EDGE_ENABLE_TENSORRT)
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"
+            "${TENSORRT_ROOT}/lib/x86_64-linux-gnu"
         NO_DEFAULT_PATH
         REQUIRED
     )
@@ -336,6 +338,7 @@ if(EDGE_ENABLE_TENSORRT)
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"
+            "${TENSORRT_ROOT}/lib/x86_64-linux-gnu"
         NO_DEFAULT_PATH
         REQUIRED
     )
@@ -449,13 +452,12 @@ if(MSVC)
         )
     endif()
 
-    # Explicitly optimize the latency-critical translation units in Release
-    # builds. /GL is supplied through CMake IPO/LTO below when supported.
+    # CMake's Release flags already select /O2 and /Ob2. Add only compatible
+    # latency-oriented flags here so MSVC does not emit option-override warnings.
+    # /GL is supplied through CMake IPO/LTO below when supported.
     target_compile_options(
         edge_project_options
         INTERFACE
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/O2>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Ob3>"
             "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Oi>"
             "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Ot>"
             "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Gy>"
@@ -572,15 +574,9 @@ set(
         src/gpu_pipeline_common.cpp
 )
 
-# benchmark.cpp is intentionally added only after that finalized module exists.
-# This keeps the already-completed core buildable without a temporary stub, and
-# automatically incorporates the benchmark implementation when it is added.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/benchmark.cpp")
-    list(APPEND EDGE_CORE_SOURCES src/benchmark.cpp)
-    set(EDGE_BENCHMARK_MODULE_AVAILABLE ON)
-else()
-    set(EDGE_BENCHMARK_MODULE_AVAILABLE OFF)
-endif()
+# The final project includes the production benchmark implementation.
+list(APPEND EDGE_CORE_SOURCES src/benchmark.cpp)
+set(EDGE_BENCHMARK_MODULE_AVAILABLE ON)
 
 if(EDGE_ENABLE_CUDA_PIPELINE)
     list(APPEND EDGE_CORE_SOURCES src/gpu_pipeline.cu)
@@ -662,40 +658,35 @@ endif()
 # Command-line application
 # =============================================================================
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
-    add_executable(
+add_executable(
+    edge_perception
+    src/main.cpp
+)
+
+target_link_libraries(
+    edge_perception
+    PRIVATE
+        edge_perception::core
+)
+
+set(EDGE_APPLICATION_AVAILABLE ON)
+
+# Keep Linux/macOS build-tree execution convenient and make installed binaries
+# search for bundled shared libraries relative to themselves.
+if(UNIX AND NOT APPLE)
+    set_target_properties(
         edge_perception
-        src/main.cpp
+        PROPERTIES
+            BUILD_RPATH_USE_ORIGIN ON
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
     )
-
-    target_link_libraries(
+elseif(APPLE)
+    set_target_properties(
         edge_perception
-        PRIVATE
-            edge_perception::core
+        PROPERTIES
+            BUILD_RPATH_USE_ORIGIN ON
+            INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
     )
-
-    set(EDGE_APPLICATION_AVAILABLE ON)
-
-    # Keep Linux/macOS build-tree execution convenient and make installed
-    # binaries search for bundled shared libraries relative to themselves.
-    if(UNIX AND NOT APPLE)
-        set_target_properties(
-            edge_perception
-            PROPERTIES
-                BUILD_RPATH_USE_ORIGIN ON
-                INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
-        )
-    elseif(APPLE)
-        set_target_properties(
-            edge_perception
-            PROPERTIES
-                BUILD_RPATH_USE_ORIGIN ON
-                INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}"
-        )
-    endif()
-else()
-    set(EDGE_APPLICATION_AVAILABLE OFF)
-    message(STATUS "src/main.cpp is pending; configuring the core library only")
 endif()
 
 # =============================================================================

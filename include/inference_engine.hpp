@@ -216,9 +216,9 @@ struct GpuExecutionConfig {
     bool use_tf32 = true;
     bool use_ep_level_unified_stream = true;
 
-    // ORT GPU runs skip the provider-wide synchronization performed at the end
-    // of Run(), then synchronize only the bound output before exposing it.
-    bool disable_provider_synchronization = true;
+    // Reserved for a future explicitly asynchronous API. InferenceEngine::run()
+    // has a synchronous host-output contract, so this must remain false.
+    bool disable_provider_synchronization = false;
 
     // Applies only to the native TensorRT backend. The graph captures H2D,
     // enqueueV3, and D2H on one non-default stream after a warm-up run.

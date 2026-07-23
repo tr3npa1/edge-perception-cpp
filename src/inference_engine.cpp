@@ -1,8 +1,21 @@
 #include "inference_engine.hpp"
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#include <windows.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -31,6 +44,27 @@ namespace edge {
 namespace {
 
 constexpr std::size_t kHostAlignment = 64U;
+constexpr std::uint32_t kOutputWriteSentinelBits = 0x7FC0D00DU;
+
+/**
+ * @brief Return a quiet-NaN payload reserved for output-write verification.
+ */
+[[nodiscard]] float output_write_sentinel() noexcept {
+    float value = 0.0F;
+    const std::uint32_t bits = kOutputWriteSentinelBits;
+
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+/**
+ * @brief Return true when a float still contains the exact write sentinel.
+ */
+[[nodiscard]] bool is_output_write_sentinel(float value) noexcept {
+    std::uint32_t bits = 0U;
+    std::memcpy(&bits, &value, sizeof(bits));
+    return bits == kOutputWriteSentinelBits;
+}
 
 /**
  * @brief Convert a filesystem path to UTF-8 for diagnostics and provider
@@ -1052,8 +1086,6 @@ public:
             cudaGraphInstantiate(
                 &executable_,
                 graph_,
-                nullptr,
-                nullptr,
                 0U
             ),
             "cudaGraphInstantiate"
@@ -1153,31 +1185,44 @@ protected:
 class OrtBackendRunner final : public BackendRunner {
 public:
     explicit OrtBackendRunner(
-        const InferenceEngineConfig& config
-    )
-        : config_(config),
-          run_options_{} {
-        try {
-            configure_session_options();
-            configure_execution_providers();
-            configure_run_options();
+    const InferenceEngineConfig& config
+)
+    : config_(config),
+      run_options_{} {
+    try {
+        // TensorRT EP uses ONNX Runtime's process-wide logger while its
+        // execution provider is being configured. Ensure the Ort::Env exists
+        // before appending any execution provider.
+        Ort::Env& environment = ort_environment();
 
-            session_ = Ort::Session{
-                ort_environment(),
-                config_.artifact_path.c_str(),
-                session_options_
-            };
+        configure_session_options();
+        configure_execution_providers();
 
-            inspect_and_validate_model();
-            allocate_and_bind_tensors();
-            populate_runtime_info();
-        } catch (const Ort::Exception& exception) {
-            throw_ort_failure(
-                "ONNX Runtime engine initialization",
-                exception
-            );
+        session_ = Ort::Session{
+            environment,
+            config_.artifact_path.c_str(),
+            session_options_
+        };
+
+        inspect_and_validate_model();
+
+        // ORT_TRT_CUDA_GRAPH_DEVICE_IO_FIX
+        // Graph ID 0 owns one persistent device input/output pair.
+        if (
+            config_.backend == InferenceBackend::OrtTensorRt
+            && config_.ort_tensorrt.enable_cuda_graph
+        ) {
+            run_options_.AddConfigEntry("gpu_graph_id", "0");
         }
+        allocate_tensors();
+        populate_runtime_info();
+    } catch (const Ort::Exception& exception) {
+        throw_ort_failure(
+            "ONNX Runtime engine initialization",
+            exception
+        );
     }
+}
 
     [[nodiscard]] MutableTensorView input_tensor() override {
         if (runtime_info_.model.input_element_type
@@ -1196,22 +1241,37 @@ public:
 
     [[nodiscard]] DetectionTensorView run() override {
         try {
-            // The ORT GPU package used by this project is built for CUDA 13,
-            // while the optional native TensorRT SDK is linked through CUDA
-            // 12.8. ORT therefore owns its provider streams, device buffers,
-            // and host/device transfers. Passing CUDA 12 runtime objects into
-            // the CUDA 13 provider would cross runtime-ABI boundaries.
-            session_.Run(run_options_, io_binding_);
+            if (uses_device_bound_io_) {
 
-            if (
-                config_.backend != InferenceBackend::OrtCpu
-                && config_.gpu.disable_provider_synchronization
-            ) {
-                // The public API remains synchronous even though provider-wide
-                // synchronization was disabled above. Wait only for the bound
-                // output transfer instead of synchronizing unrelated provider
-                // work or the entire device.
+                copy_host_input_to_device();
+
+                session_.Run(
+                    run_options_,
+                    io_binding_
+                );
+
                 io_binding_.SynchronizeOutputs();
+
+
+                copy_device_output_to_host();
+            } else {
+                const char* const input_names[] = {
+                    runtime_info_.model.input_name.c_str()
+                };
+
+                const char* const output_names[] = {
+                    runtime_info_.model.output_name.c_str()
+                };
+
+                session_.Run(
+                    run_options_,
+                    input_names,
+                    &input_value_,
+                    1U,
+                    output_names,
+                    &output_value_,
+                    1U
+                );
             }
         } catch (const Ort::Exception& exception) {
             throw_ort_failure(
@@ -1287,22 +1347,6 @@ private:
 
             session_options_.EnableProfiling(
                 config_.ort.profiling_output.c_str()
-            );
-        }
-    }
-
-    void configure_run_options() {
-        if (
-            config_.backend != InferenceBackend::OrtCpu
-            && config_.gpu.disable_provider_synchronization
-        ) {
-            // ORT normally synchronizes every execution provider at the end of
-            // Run(). This fixed I/O-bound pipeline needs only the final bound
-            // output to be ready, so run asynchronously and synchronize that
-            // output explicitly before publishing the CPU pointer.
-            run_options_.AddConfigEntry(
-                "disable_synchronize_execution_providers",
-                "1"
             );
         }
     }
@@ -1656,31 +1700,57 @@ private:
             kModelOutputElementCount * sizeof(float);
     }
 
-    void allocate_and_bind_tensors() {
-        // GPU sessions first request host-pinned storage from the allocator
-        // owned by this exact ORT session. That keeps allocation inside ORT's
-        // CUDA 13 runtime instead of crossing into the CUDA 12.8 runtime used
-        // by the optional native TensorRT backend. If this particular ORT build
-        // cannot expose its CudaPinned allocator, the engine remains correct by
-        // falling back to cache-line-aligned pageable CPU memory.
-        if (
-            config_.backend == InferenceBackend::OrtCpu
-            || !try_allocate_ort_pinned_tensors()
-        ) {
-            allocate_pageable_cpu_tensors();
+    /**
+     * @brief Allocate persistent host tensors for canonical Session::Run.
+     *
+     * ORT CUDA/TensorRT EP receives CPU Ort::Value objects and performs the
+     * required H2D/D2H transfers. Native TensorRT keeps its separate CUDA 12.8
+     * pinned-memory implementation.
+     */
+    void allocate_tensors() {
+        allocate_pageable_cpu_tensors();
+
+        uses_device_bound_io_ =
+            config_.backend == InferenceBackend::OrtTensorRt
+            && config_.ort_tensorrt.enable_cuda_graph;
+
+        if (!uses_device_bound_io_) {
+            return;
         }
+
+        allocate_cuda_graph_device_tensors();
 
         io_binding_ = Ort::IoBinding{session_};
 
         io_binding_.BindInput(
             runtime_info_.model.input_name.c_str(),
-            input_value_
+            device_input_value_
         );
 
         io_binding_.BindOutput(
             runtime_info_.model.output_name.c_str(),
-            output_value_
+            device_output_value_
         );
+    }
+
+    /**
+     * @brief Reject an output tensor that ORT did not fully overwrite.
+     */
+    void validate_completed_output() const {
+        for (
+            std::size_t index = 0U;
+            index < runtime_info_.model.output_element_count;
+            ++index
+        ) {
+            if (is_output_write_sentinel(host_output_data_[index])) {
+                throw std::runtime_error(
+                    "ONNX Runtime did not overwrite the complete output tensor; "
+                    "the write sentinel remained at flat index "
+                    + std::to_string(index)
+                    + "."
+                );
+            }
+        }
     }
 
     /**
@@ -1725,84 +1795,245 @@ private:
         host_buffers_are_pinned_ = false;
     }
 
-    /**
-     * @brief Ask ORT's own CUDA provider allocator for pinned host tensors.
-     *
-     * @return True when both persistent tensors were allocated as CudaPinned;
-     *         false when the installed ORT build does not expose that allocator.
-     */
-    [[nodiscard]] bool try_allocate_ort_pinned_tensors() {
+    void allocate_cuda_graph_device_tensors() {
         const InferenceModelInfo& model = runtime_info_.model;
 
-        try {
-            Ort::MemoryInfo memory_info{
-                "CudaPinned",
-                OrtDeviceAllocator,
-                config_.gpu.device_id,
-                OrtMemTypeCPUOutput
-            };
+        // Allocate through this exact ORT Session. No CUDA 12.8 pointer or
+        // stream enters the ORT CUDA/TensorRT execution path.
+        cuda_memory_info_ = Ort::MemoryInfo{
+            "Cuda",
+            OrtArenaAllocator,
+            config_.gpu.device_id,
+            OrtMemTypeDefault
+        };
 
-            Ort::Allocator allocator{session_, memory_info};
+        cuda_allocator_ = Ort::Allocator{
+            session_,
+            cuda_memory_info_
+        };
 
-            Ort::Value input = Ort::Value::CreateTensor(
-                allocator,
-                kModelInputShape.data(),
-                kModelInputShape.size(),
-                tensor_type_to_onnx(model.input_element_type)
+        device_input_value_ = Ort::Value::CreateTensor(
+            cuda_allocator_,
+            kModelInputShape.data(),
+            kModelInputShape.size(),
+            tensor_type_to_onnx(
+                model.input_element_type
+            )
+        );
+
+        device_output_value_ = Ort::Value::CreateTensor(
+            cuda_allocator_,
+            kModelOutputShape.data(),
+            kModelOutputShape.size(),
+            ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT
+        );
+    }
+
+    // ORT_TRT_CUDA13_RUNTIME_COPY_FIX
+#if defined(_WIN32)
+    class Cuda13Runtime final {
+    public:
+        using CudaError = int;
+
+        using CudaSetDeviceFunction =
+            CudaError (*)(int);
+
+        using CudaMemcpyFunction =
+            CudaError (*)(
+                void*,
+                const void*,
+                std::size_t,
+                int
             );
 
-            Ort::Value output = Ort::Value::CreateTensor(
-                allocator,
-                kModelOutputShape.data(),
-                kModelOutputShape.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT
+        using CudaGetErrorStringFunction =
+            const char* (*)(CudaError);
+
+        Cuda13Runtime() {
+            module_ = GetModuleHandleW(
+                L"cudart64_13.dll"
             );
 
-            // The allocator must outlive every Ort::Value it allocated. Member
-            // declaration order below intentionally enforces that lifetime.
-            pinned_memory_info_ = std::move(memory_info);
-            pinned_allocator_ = std::move(allocator);
-            input_value_ = std::move(input);
-            output_value_ = std::move(output);
-
-            host_input_data_ =
-                input_value_.GetTensorMutableRawData();
-
-            host_output_data_ =
-                output_value_.GetTensorMutableData<float>();
-
-            if (
-                host_input_data_ == nullptr
-                || host_output_data_ == nullptr
-            ) {
-                throw std::runtime_error(
-                    "ONNX Runtime returned null CudaPinned tensor storage."
+            if (module_ == nullptr) {
+                module_ = LoadLibraryW(
+                    L"cudart64_13.dll"
                 );
             }
 
-            std::memset(
-                host_input_data_,
-                0,
-                model.input_byte_count
-            );
+            if (module_ == nullptr) {
+                throw std::runtime_error(
+                    "CUDA 13 runtime DLL cudart64_13.dll "
+                    "could not be loaded."
+                );
+            }
 
-            std::memset(
-                host_output_data_,
-                0,
-                model.host_output_byte_count
-            );
+            cuda_set_device_ =
+                reinterpret_cast<CudaSetDeviceFunction>(
+                    GetProcAddress(
+                        module_,
+                        "cudaSetDevice"
+                    )
+                );
 
-            host_buffers_are_pinned_ = true;
-            return true;
-        } catch (const Ort::Exception& exception) {
-            std::cerr
-                << "[ONNX Runtime warning] CudaPinned host allocation failed; "
-                << "using aligned pageable memory instead: "
-                << exception.what()
-                << '\n';
+            cuda_memcpy_ =
+                reinterpret_cast<CudaMemcpyFunction>(
+                    GetProcAddress(
+                        module_,
+                        "cudaMemcpy"
+                    )
+                );
 
-            return false;
+            cuda_get_error_string_ =
+                reinterpret_cast<CudaGetErrorStringFunction>(
+                    GetProcAddress(
+                        module_,
+                        "cudaGetErrorString"
+                    )
+                );
+
+            if (
+                cuda_set_device_ == nullptr
+                || cuda_memcpy_ == nullptr
+                || cuda_get_error_string_ == nullptr
+            ) {
+                throw std::runtime_error(
+                    "CUDA 13 runtime DLL is missing required "
+                    "cudaSetDevice/cudaMemcpy/cudaGetErrorString exports."
+                );
+            }
         }
+
+        void copy(
+            int device_id,
+            void* destination,
+            const void* source,
+            std::size_t byte_count,
+            int copy_kind,
+            const char* operation
+        ) const {
+            if (
+                destination == nullptr
+                || source == nullptr
+            ) {
+                throw std::runtime_error(
+                    std::string{operation}
+                    + ": null source or destination pointer."
+                );
+            }
+
+            const CudaError set_device_status =
+                cuda_set_device_(device_id);
+
+            check(
+                set_device_status,
+                "cudaSetDevice"
+            );
+
+            const CudaError copy_status =
+                cuda_memcpy_(
+                    destination,
+                    source,
+                    byte_count,
+                    copy_kind
+                );
+
+            check(
+                copy_status,
+                operation
+            );
+        }
+
+    private:
+        void check(
+            CudaError status,
+            const char* operation
+        ) const {
+            constexpr CudaError cuda_success = 0;
+
+            if (status == cuda_success) {
+                return;
+            }
+
+            const char* const description =
+                cuda_get_error_string_(status);
+
+            throw std::runtime_error(
+                std::string{operation}
+                + " failed with CUDA error "
+                + std::to_string(status)
+                + ": "
+                + (
+                    description != nullptr
+                        ? description
+                        : "unknown CUDA error"
+                )
+            );
+        }
+
+        HMODULE module_ = nullptr;
+
+        CudaSetDeviceFunction cuda_set_device_ =
+            nullptr;
+
+        CudaMemcpyFunction cuda_memcpy_ =
+            nullptr;
+
+        CudaGetErrorStringFunction
+            cuda_get_error_string_ = nullptr;
+    };
+
+    static Cuda13Runtime& cuda13_runtime() {
+        static Cuda13Runtime runtime{};
+        return runtime;
+    }
+#endif
+
+    void copy_host_input_to_device() {
+#if defined(_WIN32)
+        // cudaMemcpyHostToDevice
+        constexpr int host_to_device = 1;
+
+        void* const device_destination =
+            device_input_value_.GetTensorMutableRawData();
+
+        cuda13_runtime().copy(
+            config_.gpu.device_id,
+            device_destination,
+            host_input_data_,
+            runtime_info_.model.input_byte_count,
+            host_to_device,
+            "CUDA 13 host-to-device input copy"
+        );
+#else
+        throw std::runtime_error(
+            "ORT TensorRT CUDA-graph device copies "
+            "are currently implemented only for Windows."
+        );
+#endif
+    }
+
+    void copy_device_output_to_host() {
+#if defined(_WIN32)
+        // cudaMemcpyDeviceToHost
+        constexpr int device_to_host = 2;
+
+        void* const device_source =
+            device_output_value_.GetTensorMutableRawData();
+
+        cuda13_runtime().copy(
+            config_.gpu.device_id,
+            host_output_data_,
+            device_source,
+            runtime_info_.model.host_output_byte_count,
+            device_to_host,
+            "CUDA 13 device-to-host output copy"
+        );
+#else
+        throw std::runtime_error(
+            "ORT TensorRT CUDA-graph device copies "
+            "are currently implemented only for Windows."
+        );
+#endif
     }
 
     void populate_runtime_info() {
@@ -1871,26 +2102,27 @@ private:
 
     Ort::MemoryInfo cpu_memory_info_{nullptr};
 
+    // Device allocator and tensors belong to this ORT Session.
+    Ort::MemoryInfo cuda_memory_info_{nullptr};
+    Ort::Allocator cuda_allocator_{nullptr};
+
     AlignedHostBuffer aligned_host_input_{};
     AlignedHostBuffer aligned_host_output_{};
 
     void* host_input_data_ = nullptr;
     float* host_output_data_ = nullptr;
 
-    // These members are populated only for ORT GPU sessions. They are declared
-    // before the values so reverse destruction releases tensors before the
-    // session-owned allocator that created their CudaPinned storage.
-    Ort::MemoryInfo pinned_memory_info_{nullptr};
-    Ort::Allocator pinned_allocator_{nullptr};
-
     Ort::Value input_value_{nullptr};
     Ort::Value output_value_{nullptr};
 
-    // Declared after the bound values and their backing buffers so reverse
-    // member destruction releases the binding before any referenced storage.
+    Ort::Value device_input_value_{nullptr};
+    Ort::Value device_output_value_{nullptr};
+
+    // Destroy binding before the tensors and allocator it references.
     Ort::IoBinding io_binding_{nullptr};
 
     bool host_buffers_are_pinned_ = false;
+    bool uses_device_bound_io_ = false;
     bool has_output_ = false;
 };
 
@@ -2650,6 +2882,14 @@ void GpuExecutionConfig::validate() const {
     if (!is_supported_cudnn_search(cudnn_conv_algorithm_search)) {
         throw std::invalid_argument(
             "GpuExecutionConfig.cudnn_conv_algorithm_search is invalid."
+        );
+    }
+
+    if (disable_provider_synchronization) {
+        throw std::invalid_argument(
+            "GpuExecutionConfig.disable_provider_synchronization must remain "
+            "false because InferenceEngine::run() publishes synchronous host "
+            "output."
         );
     }
 }

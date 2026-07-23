@@ -1,78 +1,196 @@
-# Python
+# Python bytecode, packaging, and virtual environments
 __pycache__/
 *.py[cod]
-*.pyo
 *.pyd
+*.egg
 *.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Virtual environments
+.eggs/
+dist/
+site/
+.python-version
 .venv/
 venv/
 env/
+ENV/
 
-# Environment files
-.env
-.env.*
-*.local
-
-# Jupyter
+# Python tooling and notebooks
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+coverage.xml
+htmlcov/
 .ipynb_checkpoints/
 
-# OS / editor
-.DS_Store
-Thumbs.db
+# Local configuration, credentials, and secrets
+.env
+.env.*
+!.env.example
+kaggle.json
+.kaggle/
+**/kaggle.json
+
+# Editors, IDEs, operating systems, and local tooling
 .vscode/
 .idea/
+.vs/
+.clangd/
+*.swp
+*.swo
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+.DS_Store
+Thumbs.db
+desktop.ini
 
-# Logs
-logs/
+# Logs, local databases, and profiling traces
 *.log
+logs/
+*.db
+mlflow.db
+*.prof
+*.profile
+*.profraw
+*.profdata
+*.nsys-rep
+*.qdrep
+*.ncu-rep
+gmon.out
+callgrind.out.*
+massif.out.*
+perf.data
+perf.data.old
 
-# Backups / temporary files
-*.bak
-*.bak*
-*.tmp
-*.temp
-
-# Data
+# Downloaded/generated datasets
 data/raw/
 data/processed/
+data/interim/
 data/external/
-*.zip
-*.tar
-*.tar.gz
-*.7z
+data/**/*.zip
+data/**/*.tar
+data/**/*.tar.gz
+data/**/*.tgz
+data/**/*.7z
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.png
+data/**/*.txt
+data/**/*.json
+data/**/*.yaml
+data/**/*.yml
 
-# Training / evaluation outputs
-mlartifacts/
+# Keep hand-written data code and documentation trackable.
+!data/*.py
+!data/README.md
+
+# Training, experiment tracking, and recovered state
 runs/
 mlruns/
-mlflow.db
+mlartifacts/
+wandb/
+recovered_mlflow/
 
-# Model artifact directories
-models/onnx/
-models/engine/
-models/ort_trt_cache/
-
-# Model artifact files
-models/**/*.onnx
-models/**/*.engine
-models/**/*.plan
-models/**/*.trt
-models/**/*.cache
-models/**/*.json
-
-# Large model checkpoints / weights
+# Model weights, deployment artifacts, and runtime caches
+models/
+weights/
+checkpoints/
 *.pt
 *.pth
 *.ckpt
-*.safetensors
+*.onnx
+*.engine
+*.engine.cache
+*.timing.cache
+*.tflite
+*.mlmodel
 
-# Prediction/evaluation generated artifacts
-predictions.json
-evaluation_summary.json
-artifact_reports.json
-parity_details.json
+# Generated inference, evaluation, and benchmark output
+outputs/
+predictions/
+artifacts/
+reports/
+benchmarks/
+benchmark_results/
+*.jsonl
+
+# CMake, Ninja, Visual Studio, and native build trees
+build/
+build-*/
+build_*/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+Makefile
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+x64/
+
+# Native binaries, libraries, and compiler intermediates
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.dylib
+*.so
+*.exe
+*.out
+*.app
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.ipdb
+*.iobj
+
+# CUDA, coverage, and generated device code
+*.cubin
+*.fatbin
+*.ptx
+*.gcda
+*.gcno
+
+# Docker and local dependency staging
+.docker/
+docker-compose.override.yml
+third_party/
+
+# Temporary, editor-recovery, patch, and backup files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.old
+*.orig
+*.rej
+*.patch
+*.diff
+*.before_*
+*~
+__rebuild.cmd
+
+# One-off repair helpers created during local debugging
+tools/apply_*_fix.py
+tools/run_ort_trt_repair.ps1
+run_full_benchmark_fixed.ps1
+run_full_benchmark_matrix.ps1
