@@ -1,0 +1,5 @@
+# Lightweight dependencies used by public CPU CI and generated ONNX tests.
+onnx==1.22.0
+numpy==2.2.6
+PyYAML==6.0.3
+pytest==9.1.1

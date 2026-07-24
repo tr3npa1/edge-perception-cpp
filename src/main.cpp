@@ -9,6 +9,7 @@
 #include <opencv2/videoio.hpp>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cctype>
@@ -21,6 +22,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -51,6 +53,7 @@ enum class ApplicationMode : std::uint8_t {
 };
 
 enum class BackendSelection : std::uint8_t {
+    Auto,
     OrtCpu,
     OrtCuda,
     OrtTensorRt,
@@ -73,7 +76,7 @@ struct SourceDescriptor {
 
 struct ApplicationOptions {
     ApplicationMode mode = ApplicationMode::Inference;
-    BackendSelection backend = BackendSelection::OrtCpu;
+    BackendSelection backend = BackendSelection::Auto;
     ArtifactPrecision precision = ArtifactPrecision::Float32;
 
     std::string source_argument{};
@@ -127,6 +130,21 @@ struct PendingFusedFrame {
     cv::Mat frame{};
     std::uint64_t frame_index = 0U;
     std::string source_label{};
+};
+
+struct BackendAttemptRecord {
+    InferenceBackend backend = InferenceBackend::OrtCpu;
+    bool succeeded = false;
+    std::string error{};
+};
+
+struct EngineSelectionResult {
+    std::unique_ptr<InferenceEngine> engine{};
+    BackendSelection requested_backend = BackendSelection::Auto;
+    InferenceBackend selected_backend = InferenceBackend::OrtCpu;
+    std::vector<std::string> available_ort_providers{};
+    std::vector<BackendAttemptRecord> attempts{};
+    bool automatic = false;
 };
 
 [[nodiscard]] std::string lowercase(std::string value) {
@@ -284,6 +302,10 @@ template <typename Integer>
 ) {
     const std::string normalized = lowercase(value);
 
+    if (normalized == "auto") {
+        return BackendSelection::Auto;
+    }
+
     if (normalized == "ort-cpu" || normalized == "ort_cpu") {
         return BackendSelection::OrtCpu;
     }
@@ -415,6 +437,9 @@ template <typename Integer>
     BackendSelection backend
 ) noexcept {
     switch (backend) {
+        case BackendSelection::Auto:
+            return "auto";
+
         case BackendSelection::OrtCpu:
             return "ort_cpu";
 
@@ -438,6 +463,9 @@ template <typename Integer>
     BackendSelection backend
 ) {
     switch (backend) {
+        case BackendSelection::Auto:
+            break;
+
         case BackendSelection::OrtCpu:
             return InferenceBackend::OrtCpu;
 
@@ -455,7 +483,8 @@ template <typename Integer>
     }
 
     throw std::invalid_argument(
-        "The fused TensorRT pipeline is not an InferenceEngine backend."
+        "Automatic or fused TensorRT selection is not a direct "
+        "InferenceEngine backend."
     );
 }
 
@@ -468,6 +497,7 @@ template <typename Integer>
         || extension == ".jpeg"
         || extension == ".png"
         || extension == ".bmp"
+        || extension == ".ppm"
         || extension == ".tif"
         || extension == ".tiff"
         || extension == ".webp";
@@ -583,8 +613,9 @@ void print_usage(std::ostream& output) {
         << "Core options:\n"
         << "  --mode infer|benchmark               Operation mode (default: infer)\n"
         << "  --source <path|camera:N>             Image, image directory, video, or camera\n"
-        << "  --backend <name>                     ort-cpu, ort-cuda, ort-trt,\n"
+        << "  --backend <name>                     auto, ort-cpu, ort-cuda, ort-trt,\n"
         << "                                       native-trt, or fused-trt\n"
+        << "                                       default: auto\n"
         << "  --model <path>                       .onnx or .engine artifact\n"
         << "  --precision fp32|fp16|int8           Artifact precision (default: fp32)\n"
         << "  --device <N>                         CUDA device index (default: 0)\n"
@@ -620,7 +651,7 @@ void print_usage(std::ostream& output) {
         << "  --version                            Show version\n\n"
         << "Examples:\n"
         << "  edge_perception --mode infer --source frame.jpg "
-           "--backend ort-cuda --model models/onnx/yolo26m_bdd100k_fp32.onnx\n"
+           "--backend auto --model models/onnx/yolo26m_bdd100k_fp32.onnx\n"
         << "  edge_perception --mode benchmark --source frame.jpg "
            "--backend fused-trt --model models/engine/yolo26m_bdd100k_fp16.engine "
            "--precision fp16 --pipeline-depth 1 --benchmark-mode latency\n"
@@ -888,6 +919,41 @@ void validate_options(const ApplicationOptions& options) {
         );
     }
 
+    const std::string model_extension =
+        lowercase(options.model_path.extension().string());
+
+    const bool requires_onnx =
+        options.backend == BackendSelection::Auto
+        || options.backend == BackendSelection::OrtCpu
+        || options.backend == BackendSelection::OrtCuda
+        || options.backend == BackendSelection::OrtTensorRt;
+
+    const bool requires_engine =
+        options.backend == BackendSelection::NativeTensorRt
+        || options.backend == BackendSelection::FusedTensorRt;
+
+    if (requires_onnx && model_extension != ".onnx") {
+        throw std::invalid_argument(
+            "The selected backend requires an .onnx model artifact."
+        );
+    }
+
+    if (requires_engine && model_extension != ".engine") {
+        throw std::invalid_argument(
+            "The selected backend requires a TensorRT .engine artifact."
+        );
+    }
+
+    if (
+        options.backend == BackendSelection::Auto
+        && options.require_cuda_graph
+    ) {
+        throw std::invalid_argument(
+            "--require-cuda-graph requires an explicit GPU backend. "
+            "Automatic selection may legitimately fall back to ORT CPU."
+        );
+    }
+
     if (options.device_id < 0) {
         throw std::invalid_argument("--device must be non-negative.");
     }
@@ -1101,12 +1167,13 @@ void validate_frame(
 }
 
 [[nodiscard]] InferenceEngineConfig make_engine_config(
-    const ApplicationOptions& options
+    const ApplicationOptions& options,
+    InferenceBackend backend
 ) {
     InferenceEngineConfig config{};
 
     config.artifact_path = options.model_path;
-    config.backend = generic_backend(options.backend);
+    config.backend = backend;
     config.artifact_precision = options.precision;
 
     config.ort.intra_op_thread_count = options.intra_op_threads;
@@ -1142,6 +1209,166 @@ void validate_frame(
 
     config.validate();
     return config;
+}
+
+[[nodiscard]] std::string_view required_provider_name(
+    InferenceBackend backend
+) noexcept {
+    switch (backend) {
+        case InferenceBackend::OrtCpu:
+            return "CPUExecutionProvider";
+
+        case InferenceBackend::OrtCuda:
+            return "CUDAExecutionProvider";
+
+        case InferenceBackend::OrtTensorRt:
+            return "TensorrtExecutionProvider";
+
+        case InferenceBackend::NativeTensorRt:
+            return {};
+    }
+
+    return {};
+}
+
+[[nodiscard]] bool contains_string(
+    const std::vector<std::string>& values,
+    std::string_view expected
+) {
+    return std::find(
+        values.begin(),
+        values.end(),
+        expected
+    ) != values.end();
+}
+
+[[nodiscard]] EngineSelectionResult select_engine(
+    const ApplicationOptions& options
+) {
+    EngineSelectionResult result{};
+    result.requested_backend = options.backend;
+    result.automatic = options.backend == BackendSelection::Auto;
+
+    try {
+        result.available_ort_providers =
+            InferenceEngine::available_onnxruntime_providers();
+    } catch (const std::exception& exception) {
+        std::cerr
+            << "ONNX Runtime provider discovery failed: "
+            << exception.what()
+            << '\n';
+    }
+
+    if (!result.automatic) {
+        const InferenceBackend backend = generic_backend(options.backend);
+
+        result.engine = std::make_unique<InferenceEngine>(
+            make_engine_config(options, backend)
+        );
+        result.selected_backend = backend;
+        result.attempts.push_back(
+            BackendAttemptRecord{backend, true, {}}
+        );
+        return result;
+    }
+
+    constexpr std::array<InferenceBackend, 3> candidates{
+        InferenceBackend::OrtTensorRt,
+        InferenceBackend::OrtCuda,
+        InferenceBackend::OrtCpu
+    };
+
+    for (const InferenceBackend backend : candidates) {
+        const std::string_view provider = required_provider_name(backend);
+
+        if (
+            !provider.empty()
+            && !result.available_ort_providers.empty()
+            && !contains_string(result.available_ort_providers, provider)
+        ) {
+            result.attempts.push_back(
+                BackendAttemptRecord{
+                    backend,
+                    false,
+                    "ONNX Runtime does not advertise "
+                        + std::string{provider}
+                }
+            );
+            continue;
+        }
+
+        try {
+            result.engine = std::make_unique<InferenceEngine>(
+                make_engine_config(options, backend)
+            );
+            result.selected_backend = backend;
+            result.attempts.push_back(
+                BackendAttemptRecord{backend, true, {}}
+            );
+            return result;
+        } catch (const std::exception& exception) {
+            result.attempts.push_back(
+                BackendAttemptRecord{
+                    backend,
+                    false,
+                    exception.what()
+                }
+            );
+        }
+    }
+
+    std::ostringstream message;
+    message
+        << "Automatic backend selection failed. "
+        << "Every portable ONNX backend was unavailable.";
+
+    for (const BackendAttemptRecord& attempt : result.attempts) {
+        message
+            << "\n  "
+            << inference_backend_name(attempt.backend)
+            << ": "
+            << (attempt.error.empty() ? "unknown failure" : attempt.error);
+    }
+
+    throw std::runtime_error(message.str());
+}
+
+void print_backend_selection(
+    const EngineSelectionResult& selection
+) {
+    std::cout
+        << "Requested backend: "
+        << backend_name(selection.requested_backend)
+        << '\n';
+
+    if (!selection.available_ort_providers.empty()) {
+        std::cout << "Available ORT providers:";
+
+        for (const std::string& provider : selection.available_ort_providers) {
+            std::cout << ' ' << provider;
+        }
+
+        std::cout << '\n';
+    }
+
+    for (const BackendAttemptRecord& attempt : selection.attempts) {
+        std::cout
+            << "Backend attempt "
+            << inference_backend_name(attempt.backend)
+            << ": "
+            << (attempt.succeeded ? "selected" : "unavailable");
+
+        if (!attempt.error.empty()) {
+            std::cout << " (" << attempt.error << ')';
+        }
+
+        std::cout << '\n';
+    }
+
+    std::cout
+        << "Selected backend: "
+        << inference_backend_name(selection.selected_backend)
+        << '\n';
 }
 
 [[nodiscard]] NativeTensorRtPipelineConfig make_pipeline_config(
@@ -1465,6 +1692,113 @@ void print_pipeline_runtime_info(
     }
 
     return output.str();
+}
+
+void write_backend_selection_metadata(
+    const ApplicationOptions& options,
+    const EngineSelectionResult& selection
+) {
+    if (
+        !options.save_output
+        && options.mode != ApplicationMode::Benchmark
+    ) {
+        return;
+    }
+
+    fs::create_directories(options.output_directory);
+
+    const fs::path output_path =
+        options.output_directory / "backend_selection.json";
+
+    std::ofstream output(
+        output_path,
+        std::ios::binary | std::ios::trunc
+    );
+
+    if (!output.is_open()) {
+        throw std::runtime_error(
+            "Failed to open backend-selection metadata: "
+            + path_to_utf8(output_path)
+        );
+    }
+
+    output
+        << "{\n"
+        << "  \"requested_backend\": \""
+        << json_escape(backend_name(selection.requested_backend))
+        << "\",\n"
+        << "  \"selected_backend\": \""
+        << json_escape(
+            inference_backend_name(selection.selected_backend)
+        )
+        << "\",\n"
+        << "  \"automatic\": "
+        << (selection.automatic ? "true" : "false")
+        << ",\n"
+        << "  \"model\": \""
+        << json_escape(path_to_utf8(options.model_path))
+        << "\",\n"
+        << "  \"available_onnxruntime_providers\": [";
+
+    for (
+        std::size_t index = 0U;
+        index < selection.available_ort_providers.size();
+        ++index
+    ) {
+        if (index != 0U) {
+            output << ", ";
+        }
+
+        output
+            << '"'
+            << json_escape(selection.available_ort_providers[index])
+            << '"';
+    }
+
+    output << "],\n  \"attempts\": [";
+
+    for (
+        std::size_t index = 0U;
+        index < selection.attempts.size();
+        ++index
+    ) {
+        if (index != 0U) {
+            output << ',';
+        }
+
+        const BackendAttemptRecord& attempt =
+            selection.attempts[index];
+
+        output
+            << "\n    {\"backend\": \""
+            << json_escape(inference_backend_name(attempt.backend))
+            << "\", \"succeeded\": "
+            << (attempt.succeeded ? "true" : "false")
+            << ", \"error\": ";
+
+        if (attempt.error.empty()) {
+            output << "null";
+        } else {
+            output
+                << '"'
+                << json_escape(attempt.error)
+                << '"';
+        }
+
+        output << '}';
+    }
+
+    if (!selection.attempts.empty()) {
+        output << '\n';
+    }
+
+    output << "  ]\n}\n";
+
+    if (!output) {
+        throw std::runtime_error(
+            "Failed while writing backend-selection metadata."
+        );
+    }
 }
 
 class DetectionJsonlWriter final {
@@ -2254,7 +2588,11 @@ int run_benchmark_mode(
         return publish_benchmark_result(options, result);
     }
 
-    InferenceEngine engine{make_engine_config(options)};
+    EngineSelectionResult selection = select_engine(options);
+    print_backend_selection(selection);
+    write_backend_selection_metadata(options, selection);
+
+    InferenceEngine& engine = *selection.engine;
     ImageProcessor processor{make_preprocess_config()};
     Postprocessor postprocessor{
         make_postprocess_config(options)
@@ -2322,7 +2660,11 @@ int run_inference_mode(
         );
     }
 
-    InferenceEngine engine{make_engine_config(options)};
+    EngineSelectionResult selection = select_engine(options);
+    print_backend_selection(selection);
+    write_backend_selection_metadata(options, selection);
+
+    InferenceEngine& engine = *selection.engine;
     ImageProcessor processor{make_preprocess_config()};
     Postprocessor postprocessor{
         make_postprocess_config(options)

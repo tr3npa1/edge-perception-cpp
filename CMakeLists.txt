@@ -6,27 +6,20 @@ endif()
 
 project(
     edge_perception_cpp
-    VERSION 0.1.0
-    DESCRIPTION "Native C++ inference and benchmarking for YOLO26M on BDD100K"
+    VERSION 1.1.0
+    DESCRIPTION "Portable C++17 YOLO26M inference with optional NVIDIA acceleration"
     LANGUAGES CXX
 )
 
 include(GNUInstallDirs)
 include(CTest)
 include(CheckIPOSupported)
-include(CMakeDependentOption)
-
-# =============================================================================
-# Build defaults
-# =============================================================================
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Give single-configuration generators such as Ninja a sensible default.
-# Visual Studio is a multi-configuration generator and ignores this branch.
 if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(
         CMAKE_BUILD_TYPE
@@ -41,7 +34,6 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     )
 endif()
 
-# Keep binaries in predictable directories for every generator.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -63,55 +55,42 @@ foreach(EDGE_CONFIG Debug Release RelWithDebInfo MinSizeRel)
 endforeach()
 
 # =============================================================================
-# Project options
+# Build options
 # =============================================================================
 
 option(
     EDGE_ENABLE_TENSORRT
-    "Build the native TensorRT .engine inference backend"
+    "Build the generic native TensorRT .engine backend"
     OFF
 )
 
-cmake_dependent_option(
+option(
     EDGE_ENABLE_CUDA_PIPELINE
-    "Build the fused CUDA preprocess/TensorRT/postprocess asynchronous pipeline"
-    ON
-    "EDGE_ENABLE_TENSORRT"
+    "Build the fused CUDA/TensorRT pipeline instead of its portable stub"
     OFF
 )
-
-set(
-    EDGE_CUDA_ARCHITECTURES
-    "native"
-    CACHE STRING
-    "CUDA architectures for the fused pipeline, for example native or 75"
-)
-
-if(EDGE_ENABLE_CUDA_PIPELINE)
-    enable_language(CUDA)
-
-    set(CMAKE_CUDA_STANDARD 17)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-    set(CMAKE_CUDA_EXTENSIONS OFF)
-    set(CMAKE_CUDA_RUNTIME_LIBRARY Shared)
-    set(CMAKE_CUDA_ARCHITECTURES "${EDGE_CUDA_ARCHITECTURES}")
-endif()
 
 option(
     EDGE_BUILD_TESTS
-    "Build and register the optional C++ inference test executable when present"
-    OFF
+    "Build and register C++ and Python regression tests"
+    ON
+)
+
+option(
+    EDGE_BUILD_PYTHON_TESTS
+    "Register pytest parity regression tests with CTest"
+    ON
 )
 
 option(
     EDGE_COPY_RUNTIME_DLLS
-    "Copy discovered runtime DLLs beside Windows executables after building"
+    "Copy discovered Windows runtime DLLs beside executables"
     ON
 )
 
 option(
     EDGE_ENABLE_IPO
-    "Enable interprocedural optimization in Release-like builds when supported"
+    "Enable interprocedural optimization where supported"
     ON
 )
 
@@ -123,19 +102,19 @@ option(
 
 option(
     EDGE_ENABLE_SANITIZERS
-    "Enable AddressSanitizer and UndefinedBehaviorSanitizer in supported builds"
+    "Enable supported address/undefined-behavior sanitizers"
     OFF
 )
 
 option(
     EDGE_ENABLE_NATIVE_ARCH
-    "Compile for the current machine's CPU instead of a portable CPU baseline"
+    "Compile for the current CPU rather than a portable baseline"
     OFF
 )
 
 option(
     EDGE_ENABLE_FAST_MATH
-    "Enable non-IEEE fast floating-point optimizations; benchmark-only and OFF for parity builds"
+    "Enable CUDA fast-math for an explicitly separate performance build"
     OFF
 )
 
@@ -150,25 +129,142 @@ set(
     ONNXRUNTIME_RUNTIME_DIR
     ""
     CACHE PATH
-    "Optional directory containing ONNX Runtime and execution-provider DLLs"
+    "Optional directory containing ONNX Runtime provider DLLs"
 )
 
 set(
     TENSORRT_ROOT
     ""
     CACHE PATH
-    "Root of the TensorRT C++ SDK; required when EDGE_ENABLE_TENSORRT=ON"
+    "Root of the TensorRT C++ SDK"
 )
 
 set(
     EDGE_EXTRA_RUNTIME_DLLS
     ""
     CACHE STRING
-    "Optional semicolon-separated list of additional Windows runtime DLLs to copy"
+    "Optional semicolon-separated Windows DLL paths copied beside executables"
 )
 
+# Environment-variable aliases keep presets and CI portable without embedding
+# machine-specific absolute paths in source control.
+if(NOT ONNXRUNTIME_ROOT AND DEFINED ENV{EDGE_ONNXRUNTIME_ROOT})
+    set(
+        ONNXRUNTIME_ROOT
+        "$ENV{EDGE_ONNXRUNTIME_ROOT}"
+        CACHE PATH
+        "Root of an extracted ONNX Runtime C/C++ package"
+        FORCE
+    )
+endif()
+
+if(
+    NOT ONNXRUNTIME_RUNTIME_DIR
+    AND DEFINED ENV{EDGE_ONNXRUNTIME_RUNTIME_DIR}
+)
+    set(
+        ONNXRUNTIME_RUNTIME_DIR
+        "$ENV{EDGE_ONNXRUNTIME_RUNTIME_DIR}"
+        CACHE PATH
+        "Optional directory containing ONNX Runtime provider DLLs"
+        FORCE
+    )
+endif()
+
+if(NOT TENSORRT_ROOT AND DEFINED ENV{EDGE_TENSORRT_ROOT})
+    set(
+        TENSORRT_ROOT
+        "$ENV{EDGE_TENSORRT_ROOT}"
+        CACHE PATH
+        "Root of the TensorRT C++ SDK"
+        FORCE
+    )
+endif()
+
+if(NOT CUDAToolkit_ROOT AND DEFINED ENV{EDGE_CUDA_ROOT})
+    set(
+        CUDAToolkit_ROOT
+        "$ENV{EDGE_CUDA_ROOT}"
+        CACHE PATH
+        "CUDA Toolkit root"
+        FORCE
+    )
+endif()
+
+if(NOT OpenCV_DIR AND DEFINED ENV{EDGE_OPENCV_DIR})
+    set(
+        OpenCV_DIR
+        "$ENV{EDGE_OPENCV_DIR}"
+        CACHE PATH
+        "Directory containing OpenCVConfig.cmake"
+        FORCE
+    )
+endif()
+
+if(NOT EDGE_EXTRA_RUNTIME_DLLS AND DEFINED ENV{EDGE_EXTRA_RUNTIME_DLLS})
+    set(
+        EDGE_EXTRA_RUNTIME_DLLS
+        "$ENV{EDGE_EXTRA_RUNTIME_DLLS}"
+        CACHE STRING
+        "Additional runtime DLLs"
+        FORCE
+    )
+endif()
+
+if(EDGE_ENABLE_CUDA_PIPELINE AND NOT EDGE_ENABLE_TENSORRT)
+    message(
+        FATAL_ERROR
+        "EDGE_ENABLE_CUDA_PIPELINE=ON requires EDGE_ENABLE_TENSORRT=ON."
+    )
+endif()
+
+# CMake selects the CUDA compiler while enable_language(CUDA) runs. Resolve it
+# from the same portable EDGE_CUDA_ROOT contract used by the presets before
+# enabling the language, rather than relying on a machine-global PATH entry.
+if(EDGE_ENABLE_CUDA_PIPELINE AND NOT CMAKE_CUDA_COMPILER)
+    if(DEFINED ENV{EDGE_CUDA_ROOT})
+        if(WIN32)
+            set(EDGE_NVCC_CANDIDATE "$ENV{EDGE_CUDA_ROOT}/bin/nvcc.exe")
+        else()
+            set(EDGE_NVCC_CANDIDATE "$ENV{EDGE_CUDA_ROOT}/bin/nvcc")
+        endif()
+
+        if(EXISTS "${EDGE_NVCC_CANDIDATE}")
+            set(
+                CMAKE_CUDA_COMPILER
+                "${EDGE_NVCC_CANDIDATE}"
+                CACHE FILEPATH
+                "CUDA compiler selected from EDGE_CUDA_ROOT"
+                FORCE
+            )
+        endif()
+    endif()
+endif()
+
+if(
+    EDGE_ENABLE_CUDA_PIPELINE
+    AND NOT CMAKE_CUDA_HOST_COMPILER
+    AND DEFINED ENV{EDGE_MSVC_COMPILER}
+    AND EXISTS "$ENV{EDGE_MSVC_COMPILER}"
+)
+    set(
+        CMAKE_CUDA_HOST_COMPILER
+        "$ENV{EDGE_MSVC_COMPILER}"
+        CACHE FILEPATH
+        "CUDA host compiler selected from EDGE_MSVC_COMPILER"
+        FORCE
+    )
+endif()
+
+if(EDGE_ENABLE_CUDA_PIPELINE)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_EXTENSIONS OFF)
+endif()
+
 # =============================================================================
-# Dependency discovery: threads and OpenCV
+# Dependencies
 # =============================================================================
 
 find_package(Threads REQUIRED)
@@ -183,13 +279,6 @@ find_package(
         videoio
 )
 
-# =============================================================================
-# Dependency discovery: ONNX Runtime
-# =============================================================================
-
-# Prefer an installed CMake package when one is available. Official extracted
-# archives do not always ship a usable package configuration, so a robust
-# ONNXRUNTIME_ROOT fallback is provided below.
 find_package(onnxruntime CONFIG QUIET)
 
 if(TARGET onnxruntime::onnxruntime)
@@ -202,9 +291,7 @@ else()
         message(
             FATAL_ERROR
             "ONNX Runtime was not found.\n"
-            "Pass the extracted C/C++ package root with:\n"
-            "  -DONNXRUNTIME_ROOT=\"C:/path/to/onnxruntime\"\n"
-            "The directory must contain include/ and lib/ or bin/."
+            "Set ONNXRUNTIME_ROOT to an extracted C/C++ release package."
         )
     endif()
 
@@ -213,8 +300,7 @@ else()
     find_path(
         ONNXRUNTIME_INCLUDE_DIR
         NAMES onnxruntime_cxx_api.h
-        HINTS
-            "${ONNXRUNTIME_ROOT}/include"
+        HINTS "${ONNXRUNTIME_ROOT}/include"
         NO_DEFAULT_PATH
         REQUIRED
     )
@@ -261,8 +347,6 @@ else()
     set(EDGE_ONNXRUNTIME_TARGET onnxruntime::onnxruntime)
 endif()
 
-# Locate ONNX Runtime execution-provider DLLs that are dynamically loaded and
-# therefore may not appear in the normal linker dependency graph.
 set(EDGE_ONNXRUNTIME_RUNTIME_DLLS)
 
 if(WIN32)
@@ -283,24 +367,15 @@ if(WIN32)
     endif()
 endif()
 
-# =============================================================================
-# Dependency discovery: native TensorRT backend
-# =============================================================================
-
 if(EDGE_ENABLE_TENSORRT)
     if(NOT TENSORRT_ROOT)
         message(
             FATAL_ERROR
-            "EDGE_ENABLE_TENSORRT=ON requires the TensorRT C++ SDK.\n"
-            "Pass its root with:\n"
-            "  -DTENSORRT_ROOT=\"C:/path/to/TensorRT\"\n"
-            "The Python tensorrt package alone is not sufficient for C++ headers "
-            "and import libraries."
+            "EDGE_ENABLE_TENSORRT=ON requires TENSORRT_ROOT."
         )
     endif()
 
     cmake_path(ABSOLUTE_PATH TENSORRT_ROOT NORMALIZE)
-
     find_package(CUDAToolkit REQUIRED)
 
     find_path(
@@ -315,30 +390,22 @@ if(EDGE_ENABLE_TENSORRT)
 
     find_library(
         TENSORRT_NVINFER_LIBRARY
-        NAMES
-            nvinfer_11
-            nvinfer_10
-            nvinfer
+        NAMES nvinfer_11 nvinfer_10 nvinfer
         HINTS
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"
-            "${TENSORRT_ROOT}/lib/x86_64-linux-gnu"
         NO_DEFAULT_PATH
         REQUIRED
     )
 
     find_library(
         TENSORRT_PLUGIN_LIBRARY
-        NAMES
-            nvinfer_plugin_11
-            nvinfer_plugin_10
-            nvinfer_plugin
+        NAMES nvinfer_plugin_11 nvinfer_plugin_10 nvinfer_plugin
         HINTS
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"
-            "${TENSORRT_ROOT}/lib/x86_64-linux-gnu"
         NO_DEFAULT_PATH
         REQUIRED
     )
@@ -346,10 +413,7 @@ if(EDGE_ENABLE_TENSORRT)
     if(WIN32)
         find_file(
             TENSORRT_NVINFER_DLL
-            NAMES
-                nvinfer_11.dll
-                nvinfer_10.dll
-                nvinfer.dll
+            NAMES nvinfer_11.dll nvinfer_10.dll nvinfer.dll
             HINTS
                 "${TENSORRT_ROOT}/bin"
                 "${TENSORRT_ROOT}/lib"
@@ -368,6 +432,18 @@ if(EDGE_ENABLE_TENSORRT)
                 "${TENSORRT_ROOT}/lib"
             NO_DEFAULT_PATH
             REQUIRED
+        )
+
+        find_file(
+            TENSORRT_ONNXPARSER_DLL
+            NAMES
+                nvonnxparser_11.dll
+                nvonnxparser_10.dll
+                nvonnxparser.dll
+            HINTS
+                "${TENSORRT_ROOT}/bin"
+                "${TENSORRT_ROOT}/lib"
+            NO_DEFAULT_PATH
         )
 
         add_library(TensorRT::nvinfer SHARED IMPORTED GLOBAL)
@@ -407,32 +483,27 @@ if(EDGE_ENABLE_TENSORRT)
 endif()
 
 # =============================================================================
-# Shared compiler policy target
+# Compiler policy
 # =============================================================================
 
 add_library(edge_project_options INTERFACE)
-
-target_compile_features(
-    edge_project_options
-    INTERFACE
-        cxx_std_17
-)
+target_compile_features(edge_project_options INTERFACE cxx_std_17)
 
 if(MSVC)
     target_compile_options(
         edge_project_options
         INTERFACE
-            "$<$<COMPILE_LANGUAGE:CXX>:/W4>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/permissive->"
-            "$<$<COMPILE_LANGUAGE:CXX>:/EHsc>"
-            "$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>"
+            $<$<COMPILE_LANGUAGE:CXX>:/W4>
+            $<$<COMPILE_LANGUAGE:CXX>:/permissive->
+            $<$<COMPILE_LANGUAGE:CXX>:/EHsc>
+            $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>
     )
 
     if(EDGE_WARNINGS_AS_ERRORS)
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:/WX>"
+                $<$<COMPILE_LANGUAGE:CXX>:/WX>
         )
     endif()
 
@@ -440,7 +511,7 @@ if(MSVC)
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>"
+                $<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>
         )
     endif()
 
@@ -448,53 +519,26 @@ if(MSVC)
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:/fsanitize=address>"
-        )
-    endif()
-
-    # CMake's Release flags already select /O2 and /Ob2. Add only compatible
-    # latency-oriented flags here so MSVC does not emit option-override warnings.
-    # /GL is supplied through CMake IPO/LTO below when supported.
-    target_compile_options(
-        edge_project_options
-        INTERFACE
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Oi>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Ot>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Gy>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/Gw>"
-    )
-
-    target_link_options(
-        edge_project_options
-        INTERFACE
-            "$<$<CONFIG:Release>:/OPT:REF>"
-            "$<$<CONFIG:Release>:/OPT:ICF>"
-    )
-
-    if(EDGE_ENABLE_FAST_MATH)
-        target_compile_options(
-            edge_project_options
-            INTERFACE
-                "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:/fp:fast>"
+                $<$<COMPILE_LANGUAGE:CXX>:/fsanitize=address>
         )
     endif()
 else()
     target_compile_options(
         edge_project_options
         INTERFACE
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wall>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wextra>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wconversion>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wsign-conversion>"
-            "$<$<COMPILE_LANGUAGE:CXX>:-Wshadow>"
+            $<$<COMPILE_LANGUAGE:CXX>:-Wall>
+            $<$<COMPILE_LANGUAGE:CXX>:-Wextra>
+            $<$<COMPILE_LANGUAGE:CXX>:-Wpedantic>
+            $<$<COMPILE_LANGUAGE:CXX>:-Wconversion>
+            $<$<COMPILE_LANGUAGE:CXX>:-Wsign-conversion>
+            $<$<COMPILE_LANGUAGE:CXX>:-Wshadow>
     )
 
     if(EDGE_WARNINGS_AS_ERRORS)
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:-Werror>"
+                $<$<COMPILE_LANGUAGE:CXX>:-Werror>
         )
     endif()
 
@@ -502,7 +546,7 @@ else()
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:-march=native>"
+                $<$<COMPILE_LANGUAGE:CXX>:-march=native>
         )
     endif()
 
@@ -510,43 +554,13 @@ else()
         target_compile_options(
             edge_project_options
             INTERFACE
-                "$<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address,undefined>"
-                "$<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>"
+                $<$<COMPILE_LANGUAGE:CXX>:-fsanitize=address,undefined>
+                $<$<COMPILE_LANGUAGE:CXX>:-fno-omit-frame-pointer>
         )
         target_link_options(
             edge_project_options
             INTERFACE
                 -fsanitize=address,undefined
-        )
-    endif()
-
-    target_compile_options(
-        edge_project_options
-        INTERFACE
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-O3>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-ffunction-sections>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-fdata-sections>"
-    )
-
-    if(APPLE)
-        target_link_options(
-            edge_project_options
-            INTERFACE
-                "$<$<CONFIG:Release>:-Wl,-dead_strip>"
-        )
-    elseif(UNIX)
-        target_link_options(
-            edge_project_options
-            INTERFACE
-                "$<$<CONFIG:Release>:-Wl,--gc-sections>"
-        )
-    endif()
-
-    if(EDGE_ENABLE_FAST_MATH)
-        target_compile_options(
-            edge_project_options
-            INTERFACE
-                "$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Release>>:-ffast-math>"
         )
     endif()
 endif()
@@ -561,22 +575,17 @@ if(WIN32)
 endif()
 
 # =============================================================================
-# Core inference library
+# Core library and CLI
 # =============================================================================
 
-# This is the final project source layout. The CMake file should not need to be
-# rewritten as the implementation files are completed.
 set(
     EDGE_CORE_SOURCES
-        src/image_processor.cpp
-        src/inference_engine.cpp
-        src/postprocess.cpp
-        src/gpu_pipeline_common.cpp
+    src/image_processor.cpp
+    src/inference_engine.cpp
+    src/postprocess.cpp
+    src/benchmark.cpp
+    src/gpu_pipeline_common.cpp
 )
-
-# The final project includes the production benchmark implementation.
-list(APPEND EDGE_CORE_SOURCES src/benchmark.cpp)
-set(EDGE_BENCHMARK_MODULE_AVAILABLE ON)
 
 if(EDGE_ENABLE_CUDA_PIPELINE)
     list(APPEND EDGE_CORE_SOURCES src/gpu_pipeline.cu)
@@ -584,17 +593,8 @@ else()
     list(APPEND EDGE_CORE_SOURCES src/gpu_pipeline_stub.cpp)
 endif()
 
-add_library(
-    edge_perception_core
-    STATIC
-        ${EDGE_CORE_SOURCES}
-)
-
-add_library(
-    edge_perception::core
-    ALIAS
-    edge_perception_core
-)
+add_library(edge_perception_core STATIC ${EDGE_CORE_SOURCES})
+add_library(edge_perception::core ALIAS edge_perception_core)
 
 target_include_directories(
     edge_perception_core
@@ -641,38 +641,29 @@ if(EDGE_ENABLE_CUDA_PIPELINE)
     set_target_properties(
         edge_perception_core
         PROPERTIES
-            CUDA_SEPARABLE_COMPILATION OFF
-            CUDA_RESOLVE_DEVICE_SYMBOLS OFF
+            CUDA_SEPARABLE_COMPILATION ON
+            CUDA_RESOLVE_DEVICE_SYMBOLS ON
     )
 
     target_compile_options(
         edge_perception_core
         PRIVATE
-            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-O3>"
-            "$<$<COMPILE_LANGUAGE:CUDA>:--extra-device-vectorization>"
-            "$<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<BOOL:${EDGE_ENABLE_FAST_MATH}>>:--use_fast_math>"
+            $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
     )
+
+    if(EDGE_ENABLE_FAST_MATH)
+        target_compile_options(
+            edge_perception_core
+            PRIVATE
+                $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>
+        )
+    endif()
 endif()
 
-# =============================================================================
-# Command-line application
-# =============================================================================
+add_executable(edge_perception src/main.cpp)
+target_link_libraries(edge_perception PRIVATE edge_perception::core)
 
-add_executable(
-    edge_perception
-    src/main.cpp
-)
-
-target_link_libraries(
-    edge_perception
-    PRIVATE
-        edge_perception::core
-)
-
-set(EDGE_APPLICATION_AVAILABLE ON)
-
-# Keep Linux/macOS build-tree execution convenient and make installed binaries
-# search for bundled shared libraries relative to themselves.
 if(UNIX AND NOT APPLE)
     set_target_properties(
         edge_perception
@@ -690,38 +681,105 @@ elseif(APPLE)
 endif()
 
 # =============================================================================
-# Optional C++ tests
+# Automated tests
 # =============================================================================
 
-set(EDGE_TEST_TARGET_AVAILABLE OFF)
-
 if(EDGE_BUILD_TESTS)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_inference.cpp")
-        add_executable(
-            edge_perception_tests
-            tests/test_inference.cpp
-        )
+    find_package(Python3 3.10 REQUIRED COMPONENTS Interpreter)
 
-        target_link_libraries(
-            edge_perception_tests
-            PRIVATE
-                edge_perception::core
-        )
+    set(
+        EDGE_GENERATED_TEST_MODEL
+        "${CMAKE_CURRENT_BINARY_DIR}/tests/fixtures/tiny_detector.onnx"
+    )
 
+    add_custom_command(
+        OUTPUT "${EDGE_GENERATED_TEST_MODEL}"
+        COMMAND
+            "${CMAKE_COMMAND}" -E make_directory
+            "${CMAKE_CURRENT_BINARY_DIR}/tests/fixtures"
+        COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/generate_test_model.py"
+            --output "${EDGE_GENERATED_TEST_MODEL}"
+        DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/generate_test_model.py"
+        COMMENT "Generating deterministic ONNX Runtime integration-test model"
+        VERBATIM
+    )
+
+    add_custom_target(
+        edge_generate_test_model
+        DEPENDS "${EDGE_GENERATED_TEST_MODEL}"
+    )
+
+    add_executable(
+        edge_perception_tests
+        tests/test_inference.cpp
+    )
+    add_dependencies(edge_perception_tests edge_generate_test_model)
+    target_link_libraries(
+        edge_perception_tests
+        PRIVATE edge_perception::core
+    )
+
+    add_test(
+        NAME edge_unit_tests
+        COMMAND edge_perception_tests --unit
+    )
+    set_tests_properties(
+        edge_unit_tests
+        PROPERTIES
+            LABELS "unit;cpu"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    add_test(
+        NAME edge_ort_cpu_integration
+        COMMAND
+            edge_perception_tests
+            --integration
+            --model "${EDGE_GENERATED_TEST_MODEL}"
+    )
+    set_tests_properties(
+        edge_ort_cpu_integration
+        PROPERTIES
+            LABELS "integration;cpu;onnxruntime"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    add_test(
+        NAME edge_auto_backend_cli
+        COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_auto_backend.py"
+            --executable "$<TARGET_FILE:edge_perception>"
+            --model "${EDGE_GENERATED_TEST_MODEL}"
+            --output-dir
+            "${CMAKE_CURRENT_BINARY_DIR}/tests/auto_backend_output"
+    )
+    set_tests_properties(
+        edge_auto_backend_cli
+        PROPERTIES
+            LABELS "integration;cpu;cli;fallback"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    if(EDGE_BUILD_PYTHON_TESTS)
         add_test(
-            NAME edge_perception_tests
-            COMMAND edge_perception_tests
+            NAME edge_python_parity_unit
+            COMMAND
+                "${Python3_EXECUTABLE}" -m pytest
+                -q
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_parity.py"
+                -m "not integration"
         )
-
         set_tests_properties(
-            edge_perception_tests
+            edge_python_parity_unit
             PROPERTIES
+                LABELS "unit;python;parity"
                 WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}"
         )
-
-        set(EDGE_TEST_TARGET_AVAILABLE ON)
-    else()
-        message(STATUS "tests/test_inference.cpp is pending; test target skipped")
     endif()
 endif()
 
@@ -737,45 +795,39 @@ if(EDGE_ENABLE_IPO)
     )
 
     if(EDGE_IPO_SUPPORTED)
-        set_property(
-            TARGET edge_perception_core
-            PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
-        )
-        set_property(
-            TARGET edge_perception_core
-            PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
-        )
-        if(EDGE_APPLICATION_AVAILABLE)
+        if(NOT EDGE_ENABLE_CUDA_PIPELINE)
             set_property(
-                TARGET edge_perception
+                TARGET edge_perception_core
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
             set_property(
-                TARGET edge_perception
+                TARGET edge_perception_core
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
             )
         endif()
 
-        if(EDGE_TEST_TARGET_AVAILABLE)
+        set_property(
+            TARGET edge_perception
+            PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+        )
+        set_property(
+            TARGET edge_perception
+            PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+
+        if(EDGE_BUILD_TESTS)
             set_property(
                 TARGET edge_perception_tests
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
-            set_property(
-                TARGET edge_perception_tests
-                PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
-            )
         endif()
     else()
-        message(
-            WARNING
-            "Interprocedural optimization is unavailable: ${EDGE_IPO_ERROR}"
-        )
+        message(WARNING "IPO/LTO unavailable: ${EDGE_IPO_ERROR}")
     endif()
 endif()
 
 # =============================================================================
-# Windows runtime DLL deployment
+# Runtime DLL deployment
 # =============================================================================
 
 function(edge_copy_runtime_dlls EDGE_TARGET)
@@ -791,7 +843,6 @@ function(edge_copy_runtime_dlls EDGE_TARGET)
             "$<TARGET_RUNTIME_DLLS:${EDGE_TARGET}>"
             "$<TARGET_FILE_DIR:${EDGE_TARGET}>"
         COMMAND_EXPAND_LISTS
-        COMMENT "Copying linked runtime DLLs for ${EDGE_TARGET}"
         VERBATIM
     )
 
@@ -803,7 +854,6 @@ function(edge_copy_runtime_dlls EDGE_TARGET)
                 "${CMAKE_COMMAND}" -E copy_if_different
                 "${EDGE_RUNTIME_DLL}"
                 "$<TARGET_FILE_DIR:${EDGE_TARGET}>"
-            COMMENT "Copying ${EDGE_RUNTIME_DLL}"
             VERBATIM
         )
     endforeach()
@@ -812,8 +862,8 @@ function(edge_copy_runtime_dlls EDGE_TARGET)
         if(NOT EXISTS "${EDGE_RUNTIME_DLL}")
             message(
                 FATAL_ERROR
-                "EDGE_EXTRA_RUNTIME_DLLS contains a missing file:\n"
-                "  ${EDGE_RUNTIME_DLL}"
+                "EDGE_EXTRA_RUNTIME_DLLS contains a missing file: "
+                "${EDGE_RUNTIME_DLL}"
             )
         endif()
 
@@ -824,17 +874,36 @@ function(edge_copy_runtime_dlls EDGE_TARGET)
                 "${CMAKE_COMMAND}" -E copy_if_different
                 "${EDGE_RUNTIME_DLL}"
                 "$<TARGET_FILE_DIR:${EDGE_TARGET}>"
-            COMMENT "Copying additional runtime DLL ${EDGE_RUNTIME_DLL}"
             VERBATIM
         )
     endforeach()
+
+    if(EDGE_ENABLE_TENSORRT)
+        foreach(
+            EDGE_TENSORRT_DLL
+            IN ITEMS
+                "${TENSORRT_NVINFER_DLL}"
+                "${TENSORRT_PLUGIN_DLL}"
+                "${TENSORRT_ONNXPARSER_DLL}"
+        )
+            if(EDGE_TENSORRT_DLL AND EXISTS "${EDGE_TENSORRT_DLL}")
+                add_custom_command(
+                    TARGET "${EDGE_TARGET}"
+                    POST_BUILD
+                    COMMAND
+                        "${CMAKE_COMMAND}" -E copy_if_different
+                        "${EDGE_TENSORRT_DLL}"
+                        "$<TARGET_FILE_DIR:${EDGE_TARGET}>"
+                    VERBATIM
+                )
+            endif()
+        endforeach()
+    endif()
 endfunction()
 
-if(EDGE_APPLICATION_AVAILABLE)
-    edge_copy_runtime_dlls(edge_perception)
-endif()
+edge_copy_runtime_dlls(edge_perception)
 
-if(EDGE_TEST_TARGET_AVAILABLE)
+if(EDGE_BUILD_TESTS)
     edge_copy_runtime_dlls(edge_perception_tests)
 endif()
 
@@ -843,52 +912,29 @@ endif()
 # =============================================================================
 
 install(
-    TARGETS edge_perception_core
+    TARGETS
+        edge_perception
+        edge_perception_core
+        edge_project_options
+    EXPORT edge_perception_targets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 )
-
-if(EDGE_APPLICATION_AVAILABLE)
-    install(
-        TARGETS edge_perception
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-    )
-endif()
 
 install(
     DIRECTORY include/
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     FILES_MATCHING
-    PATTERN "*.hpp"
-    PATTERN "*.h"
+        PATTERN "*.hpp"
+        PATTERN "*.h"
 )
 
-if(WIN32)
-    if(EDGE_ONNXRUNTIME_RUNTIME_DLLS)
-        install(
-            FILES ${EDGE_ONNXRUNTIME_RUNTIME_DLLS}
-            DESTINATION "${CMAKE_INSTALL_BINDIR}"
-            OPTIONAL
-        )
-    endif()
-
-    if(EDGE_EXTRA_RUNTIME_DLLS)
-        install(
-            FILES ${EDGE_EXTRA_RUNTIME_DLLS}
-            DESTINATION "${CMAKE_INSTALL_BINDIR}"
-            OPTIONAL
-        )
-    endif()
-
-    if(EDGE_ENABLE_TENSORRT)
-        install(
-            FILES
-                "${TENSORRT_NVINFER_DLL}"
-                "${TENSORRT_PLUGIN_DLL}"
-            DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        )
-    endif()
-endif()
+install(
+    EXPORT edge_perception_targets
+    NAMESPACE edge_perception::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/edge_perception"
+)
 
 # =============================================================================
 # Configuration summary
@@ -896,49 +942,37 @@ endif()
 
 message(STATUS "")
 message(STATUS "============================================================")
-message(STATUS "edge-perception-cpp configuration")
+message(STATUS "edge-perception-cpp ${PROJECT_VERSION}")
 message(STATUS "============================================================")
-message(STATUS "Project version:             ${PROJECT_VERSION}")
 message(STATUS "CMake generator:             ${CMAKE_GENERATOR}")
 message(STATUS "C++ compiler:                ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "C++ standard:                ${CMAKE_CXX_STANDARD}")
 message(STATUS "Build type:                  ${CMAKE_BUILD_TYPE}")
-message(STATUS "Benchmark module present:    ${EDGE_BENCHMARK_MODULE_AVAILABLE}")
-message(STATUS "CLI application present:     ${EDGE_APPLICATION_AVAILABLE}")
-message(STATUS "Build tests requested:       ${EDGE_BUILD_TESTS}")
-message(STATUS "C++ test target present:     ${EDGE_TEST_TARGET_AVAILABLE}")
+message(STATUS "Build tests:                 ${EDGE_BUILD_TESTS}")
+message(STATUS "Python tests:                ${EDGE_BUILD_PYTHON_TESTS}")
 message(STATUS "Native TensorRT backend:     ${EDGE_ENABLE_TENSORRT}")
 message(STATUS "Fused CUDA pipeline:         ${EDGE_ENABLE_CUDA_PIPELINE}")
-message(STATUS "Copy Windows runtime DLLs:   ${EDGE_COPY_RUNTIME_DLLS}")
+if(EDGE_ENABLE_NATIVE_ARCH)
+    message(STATUS "Portable CPU baseline:       OFF")
+else()
+    message(STATUS "Portable CPU baseline:       ON")
+endif()
 message(STATUS "IPO/LTO requested:           ${EDGE_ENABLE_IPO}")
-message(STATUS "Warnings as errors:          ${EDGE_WARNINGS_AS_ERRORS}")
-message(STATUS "Sanitizers:                  ${EDGE_ENABLE_SANITIZERS}")
-message(STATUS "Native CPU architecture:     ${EDGE_ENABLE_NATIVE_ARCH}")
-message(STATUS "Fast floating-point math:    ${EDGE_ENABLE_FAST_MATH}")
-message(STATUS "")
+message(STATUS "CUDA fast-math:              ${EDGE_ENABLE_FAST_MATH}")
 message(STATUS "OpenCV version:              ${OpenCV_VERSION}")
-message(STATUS "OpenCV include directories:  ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "ONNX Runtime target:         ${EDGE_ONNXRUNTIME_TARGET}")
 
 if(ONNXRUNTIME_ROOT)
     message(STATUS "ONNX Runtime root:           ${ONNXRUNTIME_ROOT}")
 endif()
 
-if(ONNXRUNTIME_RUNTIME_DIR)
-    message(STATUS "ONNX Runtime runtime dir:    ${ONNXRUNTIME_RUNTIME_DIR}")
-endif()
-
 if(EDGE_ENABLE_TENSORRT)
     message(STATUS "TensorRT root:               ${TENSORRT_ROOT}")
-    message(STATUS "TensorRT include directory:  ${TENSORRT_INCLUDE_DIR}")
-    message(STATUS "TensorRT nvinfer library:    ${TENSORRT_NVINFER_LIBRARY}")
-    message(STATUS "TensorRT plugin library:     ${TENSORRT_PLUGIN_LIBRARY}")
     message(STATUS "CUDA Toolkit version:        ${CUDAToolkit_VERSION}")
-    if(EDGE_ENABLE_CUDA_PIPELINE)
-        message(STATUS "CUDA architectures:          ${CMAKE_CUDA_ARCHITECTURES}")
-    endif()
 endif()
 
-message(STATUS "Executable output directory: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+if(EDGE_ENABLE_CUDA_PIPELINE)
+    message(STATUS "CUDA architectures:          ${CMAKE_CUDA_ARCHITECTURES}")
+endif()
+
 message(STATUS "============================================================")
 message(STATUS "")

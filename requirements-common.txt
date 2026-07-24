@@ -1,0 +1,18 @@
+# Shared Python tooling for dataset preparation, training, export, evaluation,
+# and parity tests. Install through requirements-cpu.txt or requirements-gpu.txt.
+
+setuptools==81.0.0
+wheel==0.47.0
+
+kaggle==2.2.3
+ultralytics==8.4.87
+ultralytics-thop==2.0.20
+mlflow==3.14.0
+
+onnx==1.22.0
+onnxslim==0.1.94
+opencv-python==5.0.0.93
+numpy==2.2.6
+PyYAML==6.0.3
+pytest==9.1.1
+protobuf==6.33.6

@@ -3195,6 +3195,30 @@ std::uint64_t InferenceEngine::completed_run_count() const noexcept {
 }
 
 /**
+ * @brief Return ONNX Runtime execution providers compiled into the package.
+ */
+std::vector<std::string>
+InferenceEngine::available_onnxruntime_providers() {
+    return Ort::GetAvailableProviders();
+}
+
+/**
+ * @brief Check whether ONNX Runtime advertises one execution provider.
+ */
+bool InferenceEngine::onnxruntime_provider_is_available(
+    std::string_view provider_name
+) {
+    const std::vector<std::string> providers =
+        available_onnxruntime_providers();
+
+    return std::find(
+        providers.begin(),
+        providers.end(),
+        provider_name
+    ) != providers.end();
+}
+
+/**
  * @brief Return a live implementation or reject use after move.
  */
 InferenceEngine::Impl& InferenceEngine::implementation() {

@@ -1,469 +1,418 @@
 # edge-perception-cpp
 
-High-performance YOLO26M deployment for automotive and industrial vision using BDD100K, PyTorch, MLflow, ONNX Runtime, TensorRT, CUDA, OpenCV, CMake, and native C++17.
+[![CI](https://github.com/tr3npa1/edge-perception-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/tr3npa1/edge-perception-cpp/actions/workflows/ci.yml)
 
-The repository covers the complete path from dataset preparation and training through deployment export, validation, native inference, fused GPU execution, and reproducible latency/throughput benchmarking.
+A production-oriented YOLO26M deployment and benchmarking system for automotive and industrial computer vision.
+
+The repository covers the full machine-learning deployment path:
 
 ```text
-BDD100K
+BDD100K acquisition
+→ dataset validation
 → YOLO26M training
 → MLflow experiment tracking
+→ model evaluation
 → FP32 / FP16 / INT8 export
-→ Python artifact validation
-→ native C++ deployment
-→ ONNX Runtime or TensorRT execution
-→ ordered final detections
-→ benchmark and parity reports
+→ ONNX Runtime deployment
+→ native TensorRT deployment
+→ fused CUDA/TensorRT execution
+→ Python/C++ parity validation
+→ end-to-end latency and throughput benchmarking
 ```
 
-## Status
+The central engineering goal is not merely to train an object detector. It is to build a reproducible bridge between Python model development and a portable, performance-oriented C++17 inference runtime.
 
-The Windows C++ deployment matrix has been executed and validated on the target RTX 2060 system.
+---
 
-- 12 valid backend/artifact cells
-- 12 successful smoke tests
-- 50 successful benchmark rows
-- 62/62 successful processes
-- 0 recorded failures
-- release benchmark build configured with `EDGE_BUILD_TESTS=OFF`; runtime smoke tests provide acceptance coverage
-- FP32 and FP16 final-detection count parity across all validated GPU paths
-- repaired ORT TensorRT CUDA-graph path validated for FP32 and FP16
-- fused TensorRT FP16: **5.03 ms mean end-to-end latency**
-- fused TensorRT FP16 depth 3: **254.1 FPS sustained throughput**
+## Project status
 
-The final benchmark archive was:
+### Completed
+
+- BDD100K download and validation pipeline
+- YOLO26M training
+- MLflow experiment tracking
+- model evaluation
+- FP32 ONNX export
+- FP16 ONNX export
+- INT8 ONNX post-training quantization
+- native FP32 TensorRT engine export
+- native FP16 TensorRT engine export
+- TensorRT engine provenance metadata
+- ONNX Runtime CPU inference
+- ONNX Runtime CUDA inference
+- ONNX Runtime TensorRT Execution Provider inference
+- native TensorRT inference
+- fused TensorRT/CUDA pipeline
+- image inference
+- image-directory inference
+- video inference
+- camera inference
+- asynchronous fused-pipeline execution
+- CUDA Graph execution
+- GPU postprocessing
+- persistent ONNX Runtime device I/O binding
+- reproducible benchmark output
+- automatic ONNX backend selection
+- universal ONNX Runtime CPU fallback
+- CPU-only CMake build profile
+- NVIDIA CMake build profile
+- registered CTest suite
+- Python parity unit tests
+- real PyTorch → ONNX → C++ parity validation
+- Windows CPU acceptance testing
+- Windows NVIDIA acceptance testing
+- Windows and Ubuntu CPU CI workflow
+- Linux GPU Docker packaging
+
+### Local acceptance result
+
+The final local Windows validation completed successfully after the portability upgrade:
+
+```text
+CPU CTest:
+    4/4 passed
+
+NVIDIA CTest:
+    4/4 passed
+
+Python parity unit tests:
+    7 passed
+    1 integration test deselected
+
+Real PyTorch → ONNX → C++ parity:
+    1 passed
+
+Automatic CPU fallback:
+    requested backend: auto
+    selected backend: ort_cpu
+
+Python ONNX Runtime providers after environment repair:
+    TensorrtExecutionProvider
+    CUDAExecutionProvider
+    CPUExecutionProvider
+```
+
+The registered CTest targets are:
+
+```text
+edge_unit_tests
+edge_ort_cpu_integration
+edge_auto_backend_cli
+edge_python_parity_unit
+```
+
+The old state in which CTest reported:
+
+```text
+No tests were found!!!
+```
+
+has been eliminated.
+
+---
+
+## Important project boundary
+
+This repository is a high-performance computer-vision deployment project.
+
+It is not:
+
+- automotive safety-certified software;
+- an ISO 26262 implementation;
+- a replacement for a production perception safety case;
+- a complete autonomous-driving stack;
+- a universal TensorRT binary distribution;
+- a guarantee of identical performance on all hardware.
+
+The software demonstrates deployment engineering, portability, backend selection, parity testing, TensorRT integration, CUDA optimization and reproducible benchmarking.
+
+---
+
+# Key measured results
+
+The final Windows benchmark matrix completed:
+
+```text
+12 valid artifact/backend cells
+12 successful smoke-test rows
+50 successful benchmark rows
+62/62 successful processes
+0 recorded process failures
+```
+
+Representative RTX 2060 results:
+
+| Configuration | Result |
+|---|---:|
+| Fused TensorRT FP16, pipeline depth 1 | approximately 5.03 ms mean end-to-end latency |
+| Fused TensorRT FP16, pipeline depth 3 | approximately 254.1 FPS sustained throughput |
+| Fused pipeline throughput improvement over synchronous native TensorRT | approximately 28.4% |
+
+These measurements came from the saved benchmark package:
 
 ```text
 full_matrix_20260723_204901
 ```
 
-The ORT TensorRT rows were rerun after the CUDA-graph device-I/O correction and merged into the final package. The repair is recorded in the package manifest and repair metadata.
+The benchmark distinguishes:
 
-
-## Quick start: Windows
-
-This is the shortest validated path for a fresh PowerShell session. It assumes that the repository, model artifacts, BDD100K validation images, and native SDKs already exist locally.
-
-### 1. Create the Python environment
-
-Recommended Python version: 3.11.
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+```text
+backend execution latency
+end-to-end frame latency
+streaming frame latency
+sustained throughput
 ```
 
-The pinned PyTorch build supplies the CUDA 13 and cuDNN 9 runtime DLLs used by ONNX Runtime GPU. TensorRT Python bindings are intentionally not installed by `requirements.txt`; the C++ TensorRT paths use the native SDK.
+Streaming throughput is measured from completed frames over wall-clock time. It is not inferred by taking `1000 / mean latency` when pipeline stages overlap.
 
-### 2. Define the local dependency roots
+---
 
-Adjust only these paths when your installation layout differs:
+# System architecture
 
-```powershell
-$ProjectRoot = (Resolve-Path ".").Path
+```text
+                           Python development side
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  BDD100K                                                            │
+│      │                                                              │
+│      ▼                                                              │
+│  data/download.py                                                   │
+│      │                                                              │
+│      ▼                                                              │
+│  data/dataset.py                                                    │
+│      │                                                              │
+│      ▼                                                              │
+│  training/train_detector.py                                         │
+│      │                                                              │
+│      ├──────────────► MLflow                                        │
+│      │                                                              │
+│      ▼                                                              │
+│  training/evaluate.py                                               │
+│      │                                                              │
+│      ▼                                                              │
+│  training/export_model.py                                           │
+│      │                                                              │
+│      ├────────► FP32 ONNX                                           │
+│      ├────────► FP16 ONNX                                           │
+│      ├────────► INT8 ONNX                                           │
+│      ├────────► FP32 TensorRT engine                                │
+│      ├────────► FP16 TensorRT engine                                │
+│      └────────► export and provenance metadata                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+                            artifacts
+                               │
+                               ▼
+                         Native C++17 runtime
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  image / directory / video / camera                                 │
+│      │                                                              │
+│      ▼                                                              │
+│  image_processor.cpp                                                │
+│      │                                                              │
+│      ├──── resize / letterbox                                       │
+│      ├──── BGR → RGB                                                │
+│      ├──── normalization                                            │
+│      └──── HWC → NCHW                                               │
+│      │                                                              │
+│      ▼                                                              │
+│  inference_engine.cpp                                               │
+│      │                                                              │
+│      ├──── ORT CPU                                                  │
+│      ├──── ORT CUDA                                                 │
+│      ├──── ORT TensorRT EP                                          │
+│      └──── native TensorRT                                          │
+│      │                                                              │
+│      ▼                                                              │
+│  postprocess.cpp                                                    │
+│      │                                                              │
+│      ├──── confidence filtering                                     │
+│      ├──── coordinate restoration                                   │
+│      ├──── clipping                                                 │
+│      └──── final detections                                         │
+│      │                                                              │
+│      ▼                                                              │
+│  rendered output / JSONL / benchmark report                         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 
-$env:EDGE_VS_ROOT = `
-    "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools"
-
-$env:EDGE_ONNXRUNTIME_ROOT = `
-    "E:\cpp-libs\onnxruntime-win-x64-gpu_cuda13-1.27.0"
-
-$env:EDGE_TENSORRT_ROOT = `
-    "E:\cpp-libs\TensorRT-10.9.0.34"
-
-$env:EDGE_CUDA12_ROOT = `
-    "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8"
-
-$env:EDGE_OPENCV_DIR = `
-    "C:\opencv\build\x64\vc16\lib"
-
-$env:EDGE_OPENCV_BIN = `
-    "C:\opencv\build\x64\vc16\bin"
+                         Fused NVIDIA pipeline
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  decoded frame                                                      │
+│      │                                                              │
+│      ▼                                                              │
+│  CUDA preprocessing                                                 │
+│      │                                                              │
+│      ▼                                                              │
+│  TensorRT inference                                                 │
+│      │                                                              │
+│      ▼                                                              │
+│  CUDA postprocessing                                                │
+│      │                                                              │
+│      ▼                                                              │
+│  asynchronous pipeline slots                                        │
+│      │                                                              │
+│      ▼                                                              │
+│  ordered final detections                                           │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-The native TensorRT and fused paths are compiled with CUDA 12.8. The ONNX Runtime 1.27 GPU package used here targets CUDA 13, but a standalone CUDA 13 Toolkit is not required when the matching CUDA 13 and cuDNN 9 runtime DLLs are already supplied by the Python/PyTorch environment.
+---
 
-### 3. Activate MSVC 14.39 in PowerShell
+# Backend architecture
 
-```powershell
-$VcVarsAll = Join-Path `
-    $env:EDGE_VS_ROOT `
-    "VC\Auxiliary\Build\vcvarsall.bat"
+The native executable supports five explicit backends and one automatic backend:
 
-$EnvironmentLines = cmd.exe /d /s /c `
-    "`"$VcVarsAll`" amd64 -vcvars_ver=14.39 >nul && set"
+```text
+auto
+ort-cpu
+ort-cuda
+ort-trt
+native-trt
+fused-trt
+```
 
-foreach ($Line in $EnvironmentLines) {
-    $Parts = $Line -split "=", 2
+## Automatic backend selection
 
-    if ($Parts.Count -eq 2) {
-        [Environment]::SetEnvironmentVariable(
-            $Parts[0],
-            $Parts[1],
-            "Process"
-        )
-    }
+For ONNX artifacts:
+
+```text
+--backend auto
+```
+
+attempts:
+
+```text
+ONNX Runtime TensorRT Execution Provider
+→ ONNX Runtime CUDA Execution Provider
+→ ONNX Runtime CPU Execution Provider
+```
+
+Each failed initialization attempt is recorded.
+
+The selected backend is written to:
+
+```text
+backend_selection.json
+```
+
+Example CPU-only selection:
+
+```json
+{
+  "requested_backend": "auto",
+  "selected_backend": "ort_cpu"
 }
-
-$env:EDGE_MSVC_COMPILER = (Get-Command cl.exe).Source
-$env:CUDAHOSTCXX = $env:EDGE_MSVC_COMPILER
-
-cl
 ```
 
-The compiler output must identify MSVC 19.39.
+Automatic fallback applies only to ONNX Runtime session/provider initialization.
 
-### 4. Configure and build
+It does not silently hide:
 
-```powershell
-Remove-Item -Recurse -Force build-final -ErrorAction SilentlyContinue
+- invalid model contracts;
+- malformed model outputs;
+- inference failures after successful initialization;
+- corrupted artifacts;
+- invalid preprocessing;
+- invalid postprocessing;
+- TensorRT engine deserialization failures.
 
-cmake -S . -B build-final -G Ninja `
-    -DCMAKE_BUILD_TYPE=Release `
-    -DCMAKE_CXX_COMPILER="$env:EDGE_MSVC_COMPILER" `
-    -DCMAKE_CUDA_COMPILER="$env:EDGE_CUDA12_ROOT\bin\nvcc.exe" `
-    -DCMAKE_CUDA_HOST_COMPILER="$env:EDGE_MSVC_COMPILER" `
-    -DCUDAToolkit_ROOT="$env:EDGE_CUDA12_ROOT" `
-    -DOpenCV_DIR="$env:EDGE_OPENCV_DIR" `
-    -DONNXRUNTIME_ROOT="$env:EDGE_ONNXRUNTIME_ROOT" `
-    -DONNXRUNTIME_RUNTIME_DIR="$env:EDGE_ONNXRUNTIME_ROOT\lib" `
-    -DTENSORRT_ROOT="$env:EDGE_TENSORRT_ROOT" `
-    -DEDGE_ENABLE_TENSORRT=ON `
-    -DEDGE_ENABLE_CUDA_PIPELINE=ON `
-    -DEDGE_CUDA_ARCHITECTURES=75 `
-    -DEDGE_ENABLE_IPO=ON `
-    -DEDGE_ENABLE_NATIVE_ARCH=ON `
-    -DEDGE_ENABLE_FAST_MATH=OFF `
-    -DEDGE_BUILD_TESTS=OFF
+Explicit backend requests remain strict.
 
-cmake --build build-final `
-    --target edge_perception `
-    --parallel
-```
-
-Expected executable:
+For example:
 
 ```text
-build-final\bin\Release\edge_perception.exe
+--backend ort-cuda
 ```
 
-### 5. Discover runtime DLL directories
+must initialize CUDA or fail.
 
-Run this in every fresh PowerShell process before launching GPU backends:
-
-```powershell
-$Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-
-$SitePackages = (& $Python -c `
-    "import site; print(site.getsitepackages()[0])").Trim()
-
-$TorchLib = (& $Python -c `
-    "import pathlib, torch; print((pathlib.Path(torch.__file__).resolve().parent / 'lib').resolve())").Trim()
-
-$TensorRtDllDirs = @(
-    Get-ChildItem `
-        -LiteralPath $env:EDGE_TENSORRT_ROOT `
-        -Recurse `
-        -File `
-        -Filter "*.dll" |
-    ForEach-Object { $_.Directory.FullName } |
-    Sort-Object -Unique
-)
-
-$PythonNvidiaRoot = Join-Path $SitePackages "nvidia"
-$PythonNvidiaDllDirs = @()
-
-if (Test-Path -LiteralPath $PythonNvidiaRoot -PathType Container) {
-    $PythonNvidiaDllDirs = @(
-        Get-ChildItem `
-            -LiteralPath $PythonNvidiaRoot `
-            -Recurse `
-            -File `
-            -Filter "*.dll" |
-        ForEach-Object { $_.Directory.FullName } |
-        Sort-Object -Unique
-    )
-}
-
-$RuntimeDirs = @(
-    "$ProjectRoot\build-final\bin\Release"
-    "$env:EDGE_ONNXRUNTIME_ROOT\lib"
-    $TorchLib
-    "$env:EDGE_CUDA12_ROOT\bin"
-    $env:EDGE_OPENCV_BIN
-) + $TensorRtDllDirs + $PythonNvidiaDllDirs + @($env:PATH)
-
-$env:PATH = (
-    $RuntimeDirs |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-    Select-Object -Unique
-) -join ";"
-```
-
-Verify the two dependencies that caused the most common Windows startup failures:
-
-```powershell
-where.exe cudnn64_9.dll
-where.exe nvonnxparser_10.dll
-```
-
-Both commands must print a real file path.
-
-### 6. Run a smoke benchmark
-
-Datasets, trained weights, ONNX files, and TensorRT engines are intentionally excluded from Git. Before running this command, place the required local artifacts at the paths documented in [Deployment artifacts](#deployment-artifacts).
-
-This checks executable startup, ONNX Runtime CUDA loading, model execution, and benchmark file generation:
-
-```powershell
-.\build-final\bin\Release\edge_perception.exe `
-    --mode benchmark `
-    --source .\data\raw\bdd100k\bdd100k\val\images `
-    --backend ort-cuda `
-    --model .\models\onnx\yolo26m_bdd100k_fp32.onnx `
-    --precision fp32 `
-    --pipeline-depth 1 `
-    --benchmark-mode latency `
-    --timing-scope end-to-end `
-    --benchmark-source-frames 2 `
-    --warmup 2 `
-    --iterations 3 `
-    --no-stage-timings `
-    --retain-samples `
-    --output-dir .\outputs\quick_start_smoke
-```
-
-A successful run reports:
-
-```text
-status: completed
-successful: true
-```
-
-and writes:
-
-```text
-benchmark.json
-summary.csv
-summary.txt
-samples.csv
-```
-
-For the maximum-performance path, repeat with:
+Likewise:
 
 ```text
 --backend fused-trt
---model .\models\engine\yolo26m_bdd100k_fp16.engine
---precision fp16
---require-cuda-graph
 ```
 
+must initialize the fused TensorRT/CUDA implementation or fail.
 
-## Measured C++ results
+Native and fused TensorRT engines are not part of the automatic ONNX fallback chain because `.engine` and `.onnx` are different artifact types.
 
-### Benchmark environment
+---
 
-| Component | Validated value |
-|---|---|
-| Operating system | Windows 11 |
-| GPU | NVIDIA GeForce RTX 2060, 6 GB |
-| CUDA architecture | 75 |
-| Compiler | MSVC 19.39 / toolset 14.39 |
-| Native CUDA toolkit | CUDA 12.8 |
-| TensorRT | 10.9 |
-| ONNX Runtime GPU | 1.27, CUDA 13 package |
-| OpenCV | 4.11 |
-| Model input | `[1, 3, 640, 640]` |
-| Model output | `[1, 300, 6]` |
-| Benchmark source frames | 32 BDD100K validation images |
-| Confidence threshold | 0.25 |
-| Maximum detections | 300 |
-| Latency warm-up / measured | 30 / 300 |
-| Throughput warm-up / measured | 50 / 1000 |
-| Benchmark repetitions | 1 |
+# Model contract
 
-Results are machine-specific measurements, not universal guarantees. A release-quality cross-machine report should repeat each configuration multiple times from a clean tagged commit.
-
-### Clean end-to-end latency
-
-Lower is better.
-
-| Path | Precision | Mean (ms) | Median (ms) | P95 (ms) | P99 (ms) |
-|---|---|---|---|---|---|
-| Fused TensorRT | FP16 | 5.03 | 5.06 | 5.44 | 5.78 |
-| Native TensorRT | FP16 | 5.08 | 5.05 | 5.49 | 5.80 |
-| ORT TensorRT | FP16 | 6.44 | 5.99 | 8.15 | 8.91 |
-| ORT CUDA | FP16 | 11.67 | 11.55 | 12.36 | 12.80 |
-| Fused TensorRT | FP32 | 15.72 | 15.53 | 16.72 | 17.22 |
-| Native TensorRT | FP32 | 15.96 | 15.71 | 17.12 | 17.59 |
-| ORT TensorRT | FP32 | 19.94 | 19.34 | 25.14 | 26.73 |
-| ORT CUDA | FP32 | 27.35 | 27.24 | 28.15 | 28.80 |
-| ORT CUDA | INT8 | 50.30 | 48.61 | 68.58 | 81.60 |
-| ORT CPU | FP32 | 244.11 | 243.66 | 264.35 | 271.94 |
-| ORT CPU | FP16 | 250.75 | 249.26 | 275.93 | 288.90 |
-| ORT CPU | INT8 | 453.74 | 443.53 | 575.64 | 630.64 |
-
-### Sustained throughput
-
-Higher is better. Generic backends are synchronous and therefore use effective depth 1. The fused pipeline supports several frames in flight.
-
-| Path | Precision | Depth | FPS |
-|---|---|---|---|
-| Fused TensorRT | FP16 | 3 | 254.1 |
-| Fused TensorRT | FP16 | 2 | 236.5 |
-| Fused TensorRT | FP16 | 1 | 200.4 |
-| Native TensorRT | FP16 | 1 | 198.0 |
-| ORT TensorRT | FP16 | 1 | 151.1 |
-| ORT CUDA | FP16 | 1 | 84.8 |
-| Fused TensorRT | FP32 | 3 | 70.5 |
-| Fused TensorRT | FP32 | 2 | 68.2 |
-| Fused TensorRT | FP32 | 1 | 63.1 |
-| Native TensorRT | FP32 | 1 | 62.0 |
-| ORT TensorRT | FP32 | 1 | 53.1 |
-| ORT CUDA | FP32 | 1 | 35.3 |
-| ORT CUDA | INT8 | 1 | 23.2 |
-| ORT CPU | FP32 | 1 | 4.4 |
-| ORT CPU | FP16 | 1 | 4.4 |
-| ORT CPU | INT8 | 1 | 2.4 |
-
-### Native TensorRT versus fused TensorRT
-
-Both paths execute the same serialized TensorRT engine.
-
-The generic native path uses CPU preprocessing, pinned host tensors, asynchronous copies, TensorRT `enqueueV3`, CUDA-graph replay, synchronous completion, and CPU postprocessing.
-
-The fused path owns persistent per-slot host/device resources and executes GPU preprocessing, TensorRT inference, GPU postprocessing, and compact result transfer as one asynchronous pipeline.
-
-| FP16 comparison | Native TensorRT | Fused TensorRT | Fused change |
-|---|---:|---:|---:|
-| Mean depth-1 latency | 5.0788 ms | 5.0330 ms | 0.9% lower |
-| P95 depth-1 latency | 5.4920 ms | 5.4435 ms | 0.9% lower |
-| Depth-1 throughput | 198.0 FPS | 200.4 FPS | 1.2% higher |
-| Maximum tested throughput | 198.0 FPS | 254.1 FPS at depth 3 | 28.4% higher |
-
-The defensible conclusion is:
-
-> The fused FP16 pipeline preserves native TensorRT single-frame latency while increasing sustained throughput by 28.4% at depth 3.
-
-The depth-1 latency difference is too small to claim a major latency victory. The meaningful improvement is better pipeline utilization and multi-frame concurrency.
-
-Depth 3 increases throughput by keeping several frames in flight. It does not reduce individual frame completion latency; the depth-3 FP16 run had approximately 15.16 ms mean and 22.96 ms P95 completion latency.
-
-Use:
-
-- depth 1 for minimum per-frame latency;
-- depth 2 for balanced live-stream operation;
-- depth 3 for maximum measured throughput on this RTX 2060;
-- depths 4–8 only as explicit target-hardware experiments.
-
-### FP16 conclusion
-
-FP16 is the preferred deployment precision on the tested GPU.
-
-For native TensorRT:
-
-- FP32 mean latency: 15.96 ms
-- FP16 mean latency: 5.08 ms
-- FP16 latency reduction: approximately 68%
-- FP32 throughput: 62.0 FPS
-- FP16 throughput: 198.0 FPS
-
-The FP16 engine is also roughly half the size of the FP32 engine.
-
-### INT8 status
-
-The current ONNX all-convolution INT8 artifact is **not deployment-ready** in this Windows C++ stack.
-
-Observed results:
-
-- ORT CUDA INT8: 50.30 ms mean, 23.2 FPS
-- ORT CPU INT8: 453.74 ms mean, 2.4 FPS
-- FP32 smoke baseline: 36 detections
-- INT8 ORT CPU smoke: 24 detections
-- INT8 ORT CUDA smoke: 26 detections
-
-The current TensorRT INT8 engine was excluded from native/fused benchmarking because it is incompatible with the validated Windows TensorRT runtime. Do not publish an INT8 speedup claim from this build.
-
-## Project scope
-
-The C++ application supports:
-
-- ONNX Runtime CPU;
-- ONNX Runtime CUDA Execution Provider;
-- ONNX Runtime TensorRT Execution Provider with CUDA fallback;
-- native TensorRT through the generic synchronous inference engine;
-- fused native TensorRT CUDA execution;
-- image, recursive image-directory, video, and camera sources;
-- synchronous end-to-end and backend-only latency benchmarks;
-- bounded streaming-throughput benchmarks;
-- fused pipeline depths from 1 through 8;
-- JSON, CSV, text, JSONL, image, and video outputs;
-- CUDA graph replay where supported;
-- deterministic ordered postprocessing for the exported final-detection head.
-
-## Fixed model contract
-
-The native C++ code intentionally targets one deployment contract:
+The deployed detection model uses:
 
 ```text
-input name:       images
-input shape:      [1, 3, 640, 640]
-input layout:     NCHW
-input batch:      1
-output name:      output0
-output shape:     [1, 300, 6]
-output row:       [x1, y1, x2, y2, confidence, class_id]
-host output type: FP32
+input name: model-dependent, discovered at runtime
+input shape: [1, 3, 640, 640]
+input type: float32 or float16
+
+output shape: [1, 300, 6]
 ```
 
-The exported head already returns confidence-ranked, limited final detections. Therefore the postprocessor:
+Each final output row is:
 
-- does not run another NMS;
-- does not sort detections again;
-- preserves model row order;
-- restores boxes from model coordinates to original-image coordinates;
-- applies the confidence threshold;
-- validates class IDs and malformed rows;
-- clips boxes when configured;
-- rejects invalid or degenerate boxes.
+```text
+[x1, y1, x2, y2, confidence, class_id]
+```
 
-Adding another NMS or sorting pass would alter exported-model semantics and invalidate parity.
+The C++ runtime preserves model output order.
 
-### BDD100K class order
+It does not perform a second NMS pass or reorder final detections after the model has already generated final detection rows.
 
-| ID | Class |
-|---:|---|
-| 0 | person |
-| 1 | rider |
-| 2 | car |
-| 3 | bus |
-| 4 | truck |
-| 5 | bike |
-| 6 | motor |
-| 7 | traffic light |
-| 8 | traffic sign |
-| 9 | train |
+---
 
-## Repository layout
+# BDD100K classes
+
+```text
+0  person
+1  rider
+2  car
+3  bus
+4  truck
+5  bike
+6  motor
+7  traffic light
+8  traffic sign
+9  train
+```
+
+---
+
+# Repository structure
 
 ```text
 edge-perception-cpp/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
 ├── data/
 │   ├── download.py
-│   └── dataset.py
-├── training/
-│   ├── train_detector.py
-│   ├── export_model.py
-│   └── evaluate.py
+│   ├── dataset.py
+│   ├── processed/
+│   └── raw/
+│
+├── docs/
+│
 ├── include/
 │   ├── benchmark.hpp
 │   ├── gpu_pipeline.hpp
 │   ├── image_processor.hpp
 │   ├── inference_engine.hpp
 │   └── postprocess.hpp
+│
+├── models/
+│   ├── engine/
+│   ├── onnx/
+│   └── ort_trt_cache/
+│
 ├── src/
 │   ├── benchmark.cpp
 │   ├── gpu_pipeline.cu
@@ -473,524 +422,1213 @@ edge-perception-cpp/
 │   ├── inference_engine.cpp
 │   ├── main.cpp
 │   └── postprocess.cpp
+│
 ├── tests/
-├── CMakeLists.txt
-├── Dockerfile
-├── requirements.txt
+│   ├── generate_test_model.py
+│   ├── test_auto_backend.py
+│   ├── test_inference.cpp
+│   └── test_parity.py
+│
+├── training/
+│   ├── evaluate.py
+│   ├── export_model.py
+│   └── train_detector.py
+│
+├── .dockerignore
 ├── .gitignore
+├── CMakeLists.txt
+├── CMakePresets.json
+├── Dockerfile
+├── pytest.ini
+├── requirements-common.txt
+├── requirements-cpu.txt
+├── requirements-gpu.txt
+├── requirements-tensorrt.txt
+├── requirements-test.txt
+├── requirements.txt
 └── README.md
 ```
 
-`gpu_pipeline_stub.cpp` is intentional. It provides a controlled runtime error when the fused CUDA pipeline is disabled at build time and must not be deleted.
-
-Datasets, model binaries, build trees, MLflow state, runtime caches, inference output, and benchmark archives are intentionally excluded from Git.
-
-## Deployment artifacts
-
-Expected local paths:
+Large generated artifacts are intentionally not committed:
 
 ```text
-runs/train/yolo26m_bdd100k/weights/best.pt
+BDD100K data
+training runs
+MLflow data
+PyTorch checkpoints
+ONNX models
+TensorRT engines
+ORT TensorRT caches
+benchmark output
+rendered inference output
+native build directories
+Python virtual environments
+```
 
+---
+
+# Python environments
+
+Recommended Python:
+
+```text
+Python 3.11
+```
+
+The dependency files are separated by purpose.
+
+## Main GPU development environment
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt` is the main GPU training/export/evaluation environment.
+
+## CPU testing environment
+
+```powershell
+py -3.11 -m venv .venv-cpu
+.\.venv-cpu\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements-cpu.txt
+```
+
+## Test environment
+
+```powershell
+py -3.11 -m venv .venv-test
+.\.venv-test\Scripts\Activate.ps1
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements-test.txt
+```
+
+## GPU-specific environment
+
+```powershell
+python -m pip install -r requirements-gpu.txt
+```
+
+## Optional TensorRT Python environment
+
+```powershell
+python -m pip install -r requirements-tensorrt.txt
+```
+
+TensorRT Python bindings remain optional.
+
+The native C++ TensorRT implementation uses the native NVIDIA TensorRT SDK and does not depend on the Python TensorRT package at runtime.
+
+---
+
+# Important dependency pins
+
+The validated environment includes:
+
+```text
+numpy==2.2.6
+protobuf==6.33.6
+onnxruntime-gpu==1.27.0
+```
+
+These pins are intentional.
+
+A forced reinstall of `onnxruntime-gpu` without constraints may upgrade NumPy or protobuf to versions that conflict with MLflow or Databricks dependencies.
+
+When repairing ONNX Runtime GPU without changing dependencies, use:
+
+```powershell
+python -m pip install `
+    --no-cache-dir `
+    --force-reinstall `
+    --no-deps `
+    "onnxruntime-gpu==1.27.0"
+```
+
+Then validate:
+
+```powershell
+python -m pip check
+```
+
+Expected:
+
+```text
+No broken requirements found.
+```
+
+---
+
+# Ultralytics automatic dependency installation
+
+Ultralytics may attempt to install missing packages while a model is loading.
+
+During parity validation, Ultralytics installed CPU-only:
+
+```text
+onnxruntime
+```
+
+which replaced the effective GPU runtime and temporarily reduced available providers to:
+
+```text
+AzureExecutionProvider
+CPUExecutionProvider
+```
+
+Disable automatic package modification in controlled environments:
+
+```powershell
+$env:YOLO_AUTOINSTALL = "false"
+```
+
+Persist it for the current Windows user:
+
+```powershell
+[Environment]::SetEnvironmentVariable(
+    "YOLO_AUTOINSTALL",
+    "false",
+    "User"
+)
+```
+
+The expected GPU provider list is:
+
+```text
+TensorrtExecutionProvider
+CUDAExecutionProvider
+CPUExecutionProvider
+```
+
+Verify:
+
+```powershell
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"
+```
+
+---
+
+# Dataset
+
+The project uses BDD100K object-detection data in YOLO format.
+
+## Download
+
+```powershell
+python data\download.py
+```
+
+## Validate and prepare local dataset metadata
+
+```powershell
+python data\dataset.py
+```
+
+Prepared dataset YAML:
+
+```text
+data/processed/bdd100k_yolo/bdd100k.yaml
+```
+
+The raw Kaggle YAML is not modified.
+
+The preparation step creates normalized local paths and class metadata under:
+
+```text
+data/processed/
+```
+
+---
+
+# Training
+
+Training entrypoint:
+
+```text
+training/train_detector.py
+```
+
+Representative configuration:
+
+```text
+model: YOLO26M
+dataset: BDD100K
+batch size: 16
+workers: 8
+initial learning rate: 0.01
+final learning-rate factor: 0.01
+momentum: 0.937
+weight decay: 0.0005
+warmup epochs: 3
+patience: 50
+close mosaic: final 10 epochs
+AMP: enabled
+cache: disabled
+```
+
+Example:
+
+```powershell
+python training\train_detector.py `
+    --data data\processed\bdd100k_yolo\bdd100k.yaml `
+    --device 0
+```
+
+The final deployment workflow should use the best checkpoint rather than the last checkpoint.
+
+Typical path:
+
+```text
+runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt
+```
+
+---
+
+# Evaluation
+
+Evaluation entrypoint:
+
+```text
+training/evaluate.py
+```
+
+The evaluation layer supports:
+
+- detector metrics;
+- artifact validation;
+- provider checks;
+- final-detection parity;
+- IoU matching;
+- confidence-difference checks;
+- coordinate-difference checks;
+- missing and extra detection accounting;
+- per-image parity results;
+- aggregate parity summaries.
+
+The Python parity implementation was reused by the automated regression suite rather than duplicated into a separate incompatible comparison system.
+
+---
+
+# Export
+
+Export entrypoint:
+
+```text
+training/export_model.py
+```
+
+Supported artifact families include:
+
+```text
+onnx_fp32
+onnx_fp16
+onnx_int8
+engine_fp32
+engine_fp16
+engine_int8
+```
+
+Canonical artifacts:
+
+```text
 models/onnx/yolo26m_bdd100k_fp32.onnx
 models/onnx/yolo26m_bdd100k_fp16.onnx
-models/onnx/yolo26m_bdd100k_allconv_int8.onnx
+models/onnx/yolo26m_bdd100k_int8.onnx
 
 models/engine/yolo26m_bdd100k_fp32.engine
 models/engine/yolo26m_bdd100k_fp16.engine
 models/engine/yolo26m_bdd100k_int8.engine
 ```
 
-TensorRT `.engine` files are hardware- and runtime-sensitive. Rebuild them after changing GPU architecture, TensorRT version, operating system, or incompatible CUDA/runtime components.
+## Dry run
 
-Validated artifact hashes are recorded in the final benchmark package under:
-
-```text
-metadata/model_hashes.csv
-```
-
-## Python-side model-quality results
-
-These are Python/Ultralytics evaluation measurements. They are model-quality and export-validation results, not the C++ end-to-end timings shown above.
-
-| Artifact | Precision | Recall | mAP@50 | mAP@50–95 | Python inference |
-|---|---:|---:|---:|---:|---:|
-| PyTorch FP32 | 0.756 | 0.529 | 0.602 | 0.341 | 27.65 ms |
-| ONNX FP32 | 0.731 | 0.544 | 0.601 | 0.340 | 38.59 ms |
-| ONNX FP16 | 0.731 | 0.544 | 0.600 | 0.340 | 15.01 ms |
-| ONNX all-Conv INT8 | 0.729 | 0.490 | 0.538 | 0.286 | 57.03 ms |
-| TensorRT FP32 | 0.731 | 0.544 | 0.601 | 0.340 | 23.13 ms |
-| TensorRT FP16 | 0.731 | 0.544 | 0.600 | 0.340 | 6.58 ms |
-
-The Python and C++ timing scopes differ and must not be compared without labeling the scope.
-
-# C++ architecture
-
-## Generic inference path
-
-`InferenceEngine` supports ORT CPU, ORT CUDA, ORT TensorRT, and native TensorRT.
-
-```text
-OpenCV BGR frame
-→ reusable CPU letterbox/preprocessing workspace
-→ caller-owned NCHW tensor
-→ synchronous InferenceEngine::run()
-→ CPU-readable FP32 [1,300,6]
-→ ordered CPU postprocessing
-→ DetectionBuffer
-```
-
-Key properties:
-
-- reusable input/output storage;
-- direct preprocessing into the engine input tensor;
-- ONNX Runtime I/O binding where appropriate;
-- native TensorRT pinned host buffers and persistent device buffers;
-- explicit TensorRT execution-context memory;
-- CUDA graph replay in native TensorRT;
-- fixed synchronous public completion contract;
-- FP32 and IEEE-754 binary16 input support;
-- no second NMS.
-
-For ORT GPU backends, backend-only timing includes transfers and synchronization owned by the synchronous `run()` operation.
-
-### ORT TensorRT CUDA-graph device I/O
-
-The validated Windows ORT package uses CUDA 13, while native/fused TensorRT is linked against CUDA 12.8.
-
-For ORT TensorRT CUDA-graph execution, the implementation:
-
-- allocates persistent device input/output tensors through the ORT session;
-- binds those stable device addresses once;
-- copies each host input into the persistent ORT device tensor;
-- replays graph ID 0;
-- synchronizes the bound output;
-- copies the device output back to the stable host tensor.
-
-The Windows bridge dynamically resolves `cudaSetDevice`, `cudaMemcpy`, and `cudaGetErrorString` from `cudart64_13.dll`. This avoids passing CUDA 12.8 runtime objects into the CUDA 13 ORT provider.
-
-`cudart64_13.dll` must therefore be discoverable through `PATH` when ORT TensorRT CUDA graphs are enabled.
-
-The explicit ORT CUDA-graph copy bridge is currently Windows-specific. On non-Windows systems, disable the ORT TensorRT CUDA graph with `--no-cuda-graph` unless an equivalent platform bridge has been implemented. This limitation does not apply to the native or fused CUDA 12.8 TensorRT paths.
-
-## Fused native TensorRT path
-
-For a normal OpenCV frame:
-
-```text
-cv::Mat BGR
-→ slot-owned pinned staging
-→ asynchronous packed-image H2D
-→ fused GPU resize + letterbox + color conversion + normalization + NCHW
-→ TensorRT enqueueV3
-→ ordered GPU postprocessing
-→ compact result D2H
-→ DetectionBuffer
-```
-
-For device-resident BGR, RGB, or NV12 input:
-
-```text
-device image
-→ fused GPU preprocessing
-→ TensorRT
-→ GPU postprocessing
-→ compact result D2H
-```
-
-Each slot owns persistent:
-
-- TensorRT execution context;
-- activation/workspace memory;
-- main CUDA stream;
-- optional TensorRT auxiliary streams;
-- completion event;
-- pinned host staging/result memory;
-- source and model device buffers;
-- postprocessing storage;
-- CUDA graph state.
-
-No steady-state per-frame slot allocation is required after initialization.
-
-
-# Windows build and runtime setup
-
-## Validated dependency split
-
-The measured Windows build intentionally uses two CUDA generations:
-
-| Path | Runtime generation | Purpose |
-|---|---|---|
-| Native TensorRT and fused CUDA pipeline | CUDA Toolkit 12.8 | Compiles and runs native CUDA/TensorRT code |
-| ONNX Runtime GPU 1.27 | CUDA 13 runtime ABI | Runs ORT CUDA and ORT TensorRT providers |
-| cuDNN | cuDNN 9 | Required by the ORT CUDA provider |
-| TensorRT | 10.9 | Native engine execution and ORT TensorRT provider |
-| OpenCV | 4.11 | Image/video I/O and generic CPU preprocessing |
-
-The ORT CUDA 13 runtime DLLs may come from the Python/PyTorch installation. Do not require or document a standalone `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0` directory unless it actually exists on the target machine.
-
-The native CUDA 12.8 objects and streams are never passed into the ORT CUDA 13 provider. The project keeps those runtime ownership boundaries explicit.
-
-## Validated local layout
-
-```text
-Repository:
-E:\tmkc\edge-perception-cpp
-
-Visual Studio Build Tools:
-C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools
-
-MSVC toolset:
-14.39.33519
-
-OpenCV:
-C:\opencv\build\x64\vc16
-
-ONNX Runtime GPU:
-E:\cpp-libs\onnxruntime-win-x64-gpu_cuda13-1.27.0
-
-TensorRT:
-E:\cpp-libs\TensorRT-10.9.0.34
-
-Native CUDA toolkit:
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8
-
-ORT CUDA 13 and cuDNN 9 runtime DLLs:
-resolved from the active Python/PyTorch environment
-```
-
-## Build rules
-
-- Use MSVC 19.39 as both the C++ compiler and CUDA host compiler.
-- Configure CUDA architecture 75 for the RTX 2060.
-- Keep fast math disabled for reproducibility and parity.
-- Keep `EDGE_BUILD_TESTS=OFF` unless the test targets and their dependencies are intentionally configured.
-- Delete the build directory when changing compiler, CUDA, TensorRT, ONNX Runtime, or OpenCV roots.
-- Do not copy arbitrary DLLs between CUDA installations.
-
-The complete fresh-shell configure/build sequence is provided in [Quick start: Windows](#quick-start-windows).
-
-## Runtime search-path rules
-
-The executable directory contains directly copied project dependencies when CMake can resolve them, but transitive runtime DLLs still need to be discoverable through `PATH`.
-
-The runtime bootstrap must include:
-
-- `build-final\bin\Release`;
-- ONNX Runtime `lib`;
-- PyTorch `torch\lib` or the equivalent directory containing `cudnn64_9.dll`;
-- Python NVIDIA runtime `bin` directories when present;
-- every TensorRT directory containing runtime DLLs;
-- CUDA 12.8 `bin`;
-- OpenCV `bin`.
-
-TensorRT Windows archives do not always place every DLL in the same directory. Discovering the directories recursively is safer than assuming that `nvonnxparser_10.dll` is always under `bin`.
-
-
-# Command-line application
-
-Show all options:
+Use an isolated output directory:
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe --help
+python training\export_model.py `
+    --weights runs\detect\runs\train\yolo26m_bdd100k\weights\best.pt `
+    --data data\processed\bdd100k_yolo\bdd100k.yaml `
+    --onnx-dir outputs\v11_export_dryrun\onnx `
+    --engine-dir outputs\v11_export_dryrun\engine `
+    --ort-tensorrt-cache-dir outputs\v11_export_dryrun\ort_cache `
+    --basename v11_dryrun `
+    --variants engine_fp16 `
+    --device 0 `
+    --dry-run `
+    --overwrite
 ```
 
-Core interface:
+Using isolated output paths avoids collisions with canonical production artifacts.
+
+## TensorRT engine provenance
+
+TensorRT engine metadata records information such as:
 
 ```text
---mode infer|benchmark
---source <image|directory|video|camera:N>
---backend ort-cpu|ort-cuda|ort-trt|native-trt|fused-trt
---model <path>
---precision fp32|fp16|int8
---device <N>
---confidence <0..1>
---max-detections <1..300>
---output-dir <path>
---pipeline-depth <1..8>
+source artifact path
+source artifact SHA-256
+engine artifact path
+engine artifact SHA-256
+engine size
+GPU name
+compute capability
+CUDA version
+TensorRT version
+driver information
+build flags
+build timestamp
+calibration identity when applicable
 ```
 
-Performance controls:
+TensorRT engines are target-specific.
+
+A TensorRT engine may need rebuilding when any of these change:
 
 ```text
---no-cuda-graph
---require-cuda-graph
---debug-parity
---no-stage-timings
---retain-samples
+operating system
+GPU architecture
+TensorRT version
+CUDA stack
+driver/runtime compatibility
+engine build configuration
+precision or calibration configuration
 ```
 
-`--debug-parity` is fused-only and deliberately disables GPU postprocessing and CUDA graphs to expose the slower raw-output/CPU-postprocess comparison path.
+ONNX is the portable deployment artifact.
 
-## Recommended image inference
+TensorRT `.engine` files are target-specific acceleration artifacts.
 
-### Fused TensorRT FP16
+---
+
+# Native C++ build
+
+The project requires:
+
+```text
+C++17
+CMake 3.24 or newer
+OpenCV
+ONNX Runtime C/C++ package
+Ninja or another supported CMake generator
+```
+
+Optional NVIDIA acceleration requires:
+
+```text
+NVIDIA CUDA Toolkit
+NVIDIA TensorRT SDK
+compatible host compiler
+compatible NVIDIA driver
+```
+
+---
+
+# CMake presets
+
+Two primary build profiles are provided:
+
+```text
+cpu-release
+nvidia-release
+```
+
+List them:
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe `
+cmake --list-presets
+cmake --build --list-presets
+ctest --list-presets
+```
+
+---
+
+# Windows CPU-only build
+
+Use the CPU-only ONNX Runtime C++ package.
+
+Example dependency variables:
+
+```powershell
+$env:EDGE_ONNXRUNTIME_ROOT = `
+    "E:\cpp-libs\onnxruntime-win-x64-1.27.0"
+
+$env:EDGE_ONNXRUNTIME_RUNTIME_DIR = `
+    "E:\cpp-libs\onnxruntime-win-x64-1.27.0\lib"
+
+$env:EDGE_OPENCV_DIR = `
+    "C:\opencv\build\x64\vc16\lib"
+```
+
+Configure:
+
+```powershell
+cmake --preset cpu-release
+```
+
+Build:
+
+```powershell
+cmake --build --preset cpu-release
+```
+
+Test:
+
+```powershell
+ctest `
+    --preset cpu-release `
+    --output-on-failure
+```
+
+Expected:
+
+```text
+100% tests passed, 0 tests failed out of 4
+```
+
+---
+
+# Windows NVIDIA build
+
+Example dependency variables:
+
+```powershell
+$env:EDGE_ONNXRUNTIME_ROOT = `
+    "E:\cpp-libs\onnxruntime-win-x64-gpu_cuda13-1.27.0"
+
+$env:EDGE_ONNXRUNTIME_RUNTIME_DIR = `
+    "E:\cpp-libs\onnxruntime-win-x64-gpu_cuda13-1.27.0\lib"
+
+$env:EDGE_TENSORRT_ROOT = `
+    "E:\cpp-libs\TensorRT-10.9.0.34"
+
+$env:EDGE_CUDA_ROOT = `
+    "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8"
+
+$env:EDGE_OPENCV_DIR = `
+    "C:\opencv\build\x64\vc16\lib"
+```
+
+Configure:
+
+```powershell
+cmake --preset nvidia-release
+```
+
+Build:
+
+```powershell
+cmake --build --preset nvidia-release
+```
+
+Test:
+
+```powershell
+ctest `
+    --preset nvidia-release `
+    --output-on-failure
+```
+
+Expected:
+
+```text
+100% tests passed, 0 tests failed out of 4
+```
+
+---
+
+# CUDA 12.8 and Windows host compiler
+
+CUDA 12.8 rejected the default MSVC 14.51 toolset on the validated machine.
+
+The compatible installed toolset used for the final NVIDIA build was:
+
+```text
+MSVC toolset: 14.39.33519
+compiler: 19.39.33523
+```
+
+Load it explicitly:
+
+```powershell
+$VcVars = `
+    "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
+
+cmd /s /c `
+    "`"$VcVars`" x64 -vcvars_ver=14.39 && set" |
+    ForEach-Object {
+        if ($_ -match "^([^=]+)=(.*)$") {
+            [Environment]::SetEnvironmentVariable(
+                $Matches[1],
+                $Matches[2],
+                "Process"
+            )
+        }
+    }
+
+$env:EDGE_MSVC_COMPILER = (
+    where.exe cl |
+    Select-Object -First 1
+)
+
+$env:CUDAHOSTCXX = $env:EDGE_MSVC_COMPILER
+```
+
+Confirm:
+
+```powershell
+Write-Host $env:EDGE_MSVC_COMPILER
+
+(Get-Item -LiteralPath $env:EDGE_MSVC_COMPILER).
+    VersionInfo.
+    FileVersion
+```
+
+The selected compiler path should contain:
+
+```text
+MSVC\14.39.33519\bin\Hostx64\x64\cl.exe
+```
+
+Avoid using:
+
+```text
+--allow-unsupported-compiler
+```
+
+for final release validation when a supported toolset is available.
+
+---
+
+# Command-line interface
+
+Version:
+
+```powershell
+edge_perception.exe --version
+```
+
+Help:
+
+```powershell
+edge_perception.exe --help
+```
+
+## Image inference
+
+```powershell
+edge_perception.exe `
     --mode infer `
-    --source .\samples\frame.jpg `
-    --backend fused-trt `
-    --model .\models\engine\yolo26m_bdd100k_fp16.engine `
-    --precision fp16 `
-    --pipeline-depth 1 `
-    --output-dir .\outputs\fused_fp16
+    --source samples\frame.jpg `
+    --backend auto `
+    --model models\onnx\yolo26m_bdd100k_fp32.onnx `
+    --precision fp32 `
+    --confidence 0.25 `
+    --max-detections 300 `
+    --output-dir outputs\image
 ```
 
-### Native TensorRT FP16
+## Directory inference
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe `
+edge_perception.exe `
     --mode infer `
-    --source .\samples\frame.jpg `
-    --backend native-trt `
-    --model .\models\engine\yolo26m_bdd100k_fp16.engine `
-    --precision fp16 `
-    --output-dir .\outputs\native_fp16
-```
-
-### ORT TensorRT FP16
-
-```powershell
-.\build-final\bin\Release\edge_perception.exe `
-    --mode infer `
-    --source .\samples\frame.jpg `
-    --backend ort-trt `
-    --model .\models\onnx\yolo26m_bdd100k_fp16.onnx `
-    --precision fp16 `
-    --ort-cache-dir .\models\ort_trt_cache `
-    --output-dir .\outputs\ort_trt_fp16
-```
-
-### ORT CUDA FP16
-
-```powershell
-.\build-final\bin\Release\edge_perception.exe `
-    --mode infer `
-    --source .\samples\frame.jpg `
+    --source data\raw\bdd100k\bdd100k\val\images `
     --backend ort-cuda `
-    --model .\models\onnx\yolo26m_bdd100k_fp16.onnx `
+    --model models\onnx\yolo26m_bdd100k_fp16.onnx `
     --precision fp16 `
-    --output-dir .\outputs\ort_cuda_fp16
+    --confidence 0.25 `
+    --max-detections 300 `
+    --output-dir outputs\directory
 ```
 
 ## Video inference
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe `
+edge_perception.exe `
     --mode infer `
-    --source .\samples\drive.mp4 `
+    --source samples\video.mp4 `
     --backend fused-trt `
-    --model .\models\engine\yolo26m_bdd100k_fp16.engine `
+    --model models\engine\yolo26m_bdd100k_fp16.engine `
+    --precision fp16 `
+    --pipeline-depth 3 `
+    --output-dir outputs\video
+```
+
+## Camera inference
+
+```powershell
+edge_perception.exe `
+    --mode infer `
+    --source 0 `
+    --backend fused-trt `
+    --model models\engine\yolo26m_bdd100k_fp16.engine `
     --precision fp16 `
     --pipeline-depth 2 `
-    --output-dir .\outputs\video
+    --output-dir outputs\camera
 ```
 
-Use depth 3 for maximum measured throughput when additional queueing latency is acceptable.
+---
 
-## Output files
+# Supported image extensions
 
-With saving enabled:
+The CLI accepts common image formats including:
 
 ```text
-output-dir/
-├── detections.jsonl
-├── <image>_detections.jpg
-└── <video>_detections.mp4
+.jpg
+.jpeg
+.png
+.bmp
+.ppm
+.tif
+.tiff
+.webp
 ```
 
-Use `--no-save` when measuring inference without annotation and disk-write overhead.
+PPM support is intentional.
+
+The automatic-backend CLI integration test creates a deterministic PPM fixture because PPM is simple to generate without adding another image-writing dependency to the test.
+
+OpenCV performs the actual image decoding.
+
+---
+
+# Testing
+
+## Python unit tests
+
+```powershell
+python -m pytest `
+    -q `
+    tests\test_parity.py `
+    -m "not integration"
+```
+
+Validated result:
+
+```text
+7 passed
+1 deselected
+```
+
+## Test collection
+
+```powershell
+python -m pytest --collect-only -q
+```
+
+## Generated ONNX fixture
+
+```powershell
+python tests\generate_test_model.py `
+    --output build\v11-preflight\tiny_detector.onnx
+```
+
+The fixture has:
+
+```text
+input:  images
+output: output0
+```
+
+and is checked with the ONNX model checker.
+
+## CTest
+
+List tests:
+
+```powershell
+ctest `
+    --test-dir build\cpu-release `
+    -C Release `
+    -N
+```
+
+Run CPU tests:
+
+```powershell
+ctest `
+    --preset cpu-release `
+    --output-on-failure
+```
+
+Run NVIDIA tests:
+
+```powershell
+ctest `
+    --preset nvidia-release `
+    --output-on-failure
+```
+
+## C++ unit coverage
+
+The C++ tests cover:
+
+```text
+letterbox geometry
+BGR to RGB conversion
+NCHW tensor layout
+normalization
+coordinate restoration
+box clipping
+malformed detection rows
+confidence validation
+class validation
+benchmark statistics
+provider discovery
+ORT CPU end-to-end inference
+```
+
+## Automatic-backend CLI integration
+
+The test:
+
+```text
+tests/test_auto_backend.py
+```
+
+creates:
+
+```text
+a deterministic PPM image
+a deterministic ONNX detector fixture
+an isolated output directory
+```
+
+It launches the actual C++ executable with:
+
+```text
+--backend auto
+```
+
+and verifies:
+
+```text
+successful process exit
+backend_selection.json creation
+detections.jsonl creation
+requested backend = auto
+selected backend = ort_cpu on the CPU configuration
+```
+
+## Real parity integration
+
+The optional integration test compares:
+
+```text
+PyTorch checkpoint
+ONNX Runtime inference
+native C++ ORT CPU inference
+```
+
+Environment variables:
+
+```text
+EDGE_TEST_WEIGHTS
+EDGE_TEST_ONNX_MODEL
+EDGE_TEST_IMAGE
+EDGE_TEST_EXECUTABLE
+EDGE_TEST_DEVICE
+EDGE_TEST_CONFIDENCE
+EDGE_TEST_IOU
+EDGE_TEST_MAX_DETECTIONS
+```
+
+Run:
+
+```powershell
+python -m pytest `
+    -q `
+    tests\test_parity.py `
+    -m "integration" `
+    -s
+```
+
+Validated result:
+
+```text
+1 passed
+```
+
+---
+
+# Continuous integration
+
+Workflow:
+
+```text
+.github/workflows/ci.yml
+```
+
+The CPU CI matrix targets:
+
+```text
+Windows
+Ubuntu
+```
+
+The workflow is responsible for validating:
+
+```text
+Python syntax
+Python parity unit tests
+CMake configuration
+CPU compilation
+CTest registration
+CTest execution
+```
+
+GPU testing is not assumed on ordinary public GitHub-hosted runners.
+
+The full NVIDIA acceptance suite remains a local or self-hosted-runner responsibility.
+
+---
 
 # Benchmarking
 
-## Correctness rules
-
-- warm-up iterations are excluded;
-- source frames are preloaded;
-- latency and throughput are separate modes;
-- fused asynchronous latency is measured through completion, not submission;
-- throughput timing includes drain completion;
-- failed frames are excluded from the FPS numerator;
-- unsupported stage timings remain unavailable instead of becoming zero;
-- drawing and disk output are excluded;
-- the same artifact, confidence threshold, source set, and output contract are used for comparable paths;
-- no benchmark path adds NMS or reorders detections.
-
-## Minimum-latency benchmark
+## Latency
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe `
+edge_perception.exe `
     --mode benchmark `
-    --source .\data\raw\bdd100k\bdd100k\val\images `
+    --source data\raw\bdd100k\bdd100k\val\images `
     --backend fused-trt `
-    --model .\models\engine\yolo26m_bdd100k_fp16.engine `
+    --model models\engine\yolo26m_bdd100k_fp16.engine `
     --precision fp16 `
-    --pipeline-depth 1 `
     --benchmark-mode latency `
     --timing-scope end-to-end `
-    --benchmark-source-frames 32 `
+    --pipeline-depth 1 `
     --warmup 30 `
     --iterations 300 `
-    --no-stage-timings `
-    --retain-samples `
-    --output-dir .\benchmarks\manual_fused_fp16_latency
+    --output-dir benchmarks\latency
 ```
 
-## Maximum-throughput benchmark
+## Throughput
 
 ```powershell
-.\build-final\bin\Release\edge_perception.exe `
+edge_perception.exe `
     --mode benchmark `
-    --source .\data\raw\bdd100k\bdd100k\val\images `
+    --source data\raw\bdd100k\bdd100k\val\images `
     --backend fused-trt `
-    --model .\models\engine\yolo26m_bdd100k_fp16.engine `
+    --model models\engine\yolo26m_bdd100k_fp16.engine `
     --precision fp16 `
-    --pipeline-depth 3 `
     --benchmark-mode throughput `
     --timing-scope end-to-end `
-    --benchmark-source-frames 32 `
+    --pipeline-depth 3 `
     --warmup 50 `
     --iterations 1000 `
-    --no-stage-timings `
-    --retain-samples `
-    --output-dir .\benchmarks\manual_fused_fp16_throughput
+    --output-dir benchmarks\throughput
 ```
 
-Each run writes:
+## Pipeline depth
+
+Supported range:
 
 ```text
-summary.txt
-benchmark.json
-summary.csv
-samples.csv          # only with --retain-samples
+1 through 8
 ```
 
-The full matrix runner additionally creates aggregate rankings, smoke parity tables, telemetry, runtime metadata, hashes, checksums, and a packaged archive.
+Default:
 
+```text
+2
+```
 
-# Pre-commit validation
+For synchronous generic backends, effective pipeline depth remains one.
 
-Run validation from a fresh PowerShell session after completing the runtime bootstrap from the Quick Start section.
+For fused TensorRT, additional pipeline slots permit overlap between frame processing stages.
 
-## Required checks
+---
+
+# Docker
+
+The Docker image provides a coherent Linux NVIDIA stack.
+
+Base image:
+
+```text
+nvcr.io/nvidia/tensorrt:25.03-py3
+```
+
+Container stack:
+
+```text
+Ubuntu 24.04
+CUDA 12.8 generation
+TensorRT 10.9 generation
+ONNX Runtime GPU 1.26
+OpenCV
+CMake
+Ninja
+native C++17 application
+```
+
+The container does not include:
+
+```text
+BDD100K
+PyTorch checkpoints
+ONNX deployment models
+TensorRT engine artifacts
+benchmark input data
+generated output
+```
+
+These are mounted at runtime.
+
+## Important engine rule
+
+A TensorRT engine created on Windows must not be treated as a portable Linux engine.
+
+Create a new Linux TensorRT engine inside the target Linux container/runtime.
+
+Portable artifact:
+
+```text
+ONNX
+```
+
+Target-specific artifact:
+
+```text
+TensorRT .engine
+```
+
+## Build architecture
+
+RTX 2060 uses CUDA compute capability 7.5:
 
 ```powershell
-git diff --check
-
-cmake --build build-final `
-    --target edge_perception `
-    --clean-first `
-    --parallel
-
-.\build-final\bin\Release\edge_perception.exe --version
+docker build `
+    --build-arg CUDA_ARCHITECTURES=75 `
+    --tag edge-perception-cpp:1.1.0 `
+    .
 ```
 
-Then run short benchmark smoke tests for these paths:
+## Runtime GPU access
 
-| Smoke cell | Artifact |
-|---|---|
-| ORT CPU FP32 | `models/onnx/yolo26m_bdd100k_fp32.onnx` |
-| ORT CUDA FP32 | `models/onnx/yolo26m_bdd100k_fp32.onnx` |
-| ORT TensorRT FP16 | `models/onnx/yolo26m_bdd100k_fp16.onnx` |
-| Native TensorRT FP16 | `models/engine/yolo26m_bdd100k_fp16.engine` |
-| Fused TensorRT FP16 depth 1 | `models/engine/yolo26m_bdd100k_fp16.engine` |
-| Fused TensorRT FP16 depth 3 throughput | `models/engine/yolo26m_bdd100k_fp16.engine` |
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    edge-perception-cpp:1.1.0 `
+    --version
+```
 
-For a smoke run, use two warm-up frames and three measured frames. Every process must:
+## ORT CUDA inference
 
-- return exit code zero;
-- report `status: completed`;
-- report `successful: true`;
-- create non-empty `benchmark.json`, `summary.csv`, and `samples.csv`.
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    --volume "${PWD}\models\onnx:/workspace/models/onnx:ro" `
+    --volume "${PWD}\samples:/workspace/inputs:ro" `
+    --volume "${PWD}\outputs\docker:/workspace/outputs" `
+    edge-perception-cpp:1.1.0 `
+    --mode infer `
+    --source /workspace/inputs/frame.jpg `
+    --backend ort-cuda `
+    --model /workspace/models/onnx/yolo26m_bdd100k_fp32.onnx `
+    --precision fp32 `
+    --output-dir /workspace/outputs
+```
 
-The full 12-cell benchmark matrix remains the publishable performance evidence. Short smoke runs verify that the current checkout still builds, starts, loads its dependencies, executes each major runtime family, and writes benchmark artifacts.
+## ORT TensorRT inference
 
-## CTest interpretation
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    --volume "${PWD}\models\onnx:/workspace/models/onnx:ro" `
+    --volume "${PWD}\models\docker-ort-cache:/workspace/cache" `
+    --volume "${PWD}\samples:/workspace/inputs:ro" `
+    --volume "${PWD}\outputs\docker-ort-trt:/workspace/outputs" `
+    edge-perception-cpp:1.1.0 `
+    --mode infer `
+    --source /workspace/inputs/frame.jpg `
+    --backend ort-trt `
+    --model /workspace/models/onnx/yolo26m_bdd100k_fp32.onnx `
+    --precision fp32 `
+    --ort-cache-dir /workspace/cache `
+    --output-dir /workspace/outputs
+```
 
-The validated maximum-performance configuration uses:
+## Linux TensorRT engine creation
+
+Use `trtexec` inside the image:
+
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    --entrypoint /bin/bash `
+    --volume "${PWD}\models\onnx:/workspace/models/onnx:ro" `
+    --volume "${PWD}\models\docker-engine:/workspace/models/engine" `
+    edge-perception-cpp:1.1.0 `
+    -lc "trtexec --onnx=/workspace/models/onnx/yolo26m_bdd100k_fp16.onnx --saveEngine=/workspace/models/engine/yolo26m_bdd100k_fp16_linux_sm75.engine --fp16 --memPoolSize=workspace:4096 --skipInference"
+```
+
+## Fused TensorRT inference
+
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    --volume "${PWD}\models\docker-engine:/workspace/models/engine:ro" `
+    --volume "${PWD}\samples:/workspace/inputs:ro" `
+    --volume "${PWD}\outputs\docker-fused:/workspace/outputs" `
+    edge-perception-cpp:1.1.0 `
+    --mode infer `
+    --source /workspace/inputs/frame.jpg `
+    --backend fused-trt `
+    --model /workspace/models/engine/yolo26m_bdd100k_fp16_linux_sm75.engine `
+    --precision fp16 `
+    --pipeline-depth 1 `
+    --require-cuda-graph `
+    --output-dir /workspace/outputs
+```
+
+---
+
+# Reproducibility
+
+Record the following for publishable results:
 
 ```text
-EDGE_BUILD_TESTS=OFF
+Git commit
+Git working-tree state
+operating system
+CPU
+GPU
+NVIDIA driver
+compiler
+host compiler toolset
+CUDA toolkit
+CUDA runtime
+cuDNN
+TensorRT
+ONNX Runtime
+OpenCV
+CMake
+model artifact path
+model artifact SHA-256
+executable SHA-256
+source SHA-256
+precision
+backend
+pipeline depth
+CUDA Graph state
+GPU postprocessing state
+warm-up count
+measured iteration count
+timing scope
+source-frame identity
+fast-math state
 ```
 
-Therefore:
+Do not compare benchmark numbers without matching:
 
 ```text
-No tests were found!!!
+hardware
+software stack
+artifact
+precision
+warm-up
+iterations
+timing scope
+input set
+pipeline depth
+CUDA Graph configuration
 ```
 
-is expected when `ctest` is run against that build tree. It is not a test failure, but it is also not evidence that unit tests passed. Runtime acceptance comes from the executable smoke matrix.
-
-
+---
 
 # Troubleshooting
 
-## `cudnn64_9.dll` is missing
+## `No tests were found!!!`
 
-Typical error:
+The current release configuration registers four CTest targets.
 
-```text
-Error loading onnxruntime_providers_cuda.dll
-which depends on cudnn64_9.dll which is missing
-```
-
-Resolve the active PyTorch DLL directory and prepend it to `PATH`:
+Delete stale build directories and reconfigure:
 
 ```powershell
-$Python = ".\.venv\Scripts\python.exe"
+Remove-Item `
+    -LiteralPath build\cpu-release `
+    -Recurse `
+    -Force `
+    -ErrorAction SilentlyContinue
 
-$TorchLib = (& $Python -c `
-    "import pathlib, torch; print((pathlib.Path(torch.__file__).resolve().parent / 'lib').resolve())").Trim()
-
-$env:PATH = "$TorchLib;$env:PATH"
-
-where.exe cudnn64_9.dll
+cmake --preset cpu-release
+cmake --build --preset cpu-release
+ctest --preset cpu-release --output-on-failure
 ```
 
-When `cudnn64_9.dll` is not present there, locate a matching cuDNN 9 runtime installation and add the directory that actually contains the DLL.
+## Unsupported source extension `.ppm`
 
-Do not blindly reinstall `onnxruntime-gpu[cuda,cudnn]` to solve this on Windows. CUDA 13 auxiliary packages may not be available from pip for every Python and platform combination.
+The deterministic automatic-backend test uses PPM.
 
-## `nvonnxparser_10.dll` is missing
-
-Typical error:
+The CLI now intentionally accepts:
 
 ```text
-Error loading onnxruntime_providers_tensorrt.dll
-which depends on nvonnxparser_10.dll which is missing
+.ppm
 ```
 
-Add every TensorRT directory containing DLLs:
+Rebuild after updating `src/main.cpp`.
+
+## CUDA rejects the Visual Studio compiler
+
+Select the installed MSVC 14.39 toolset before configuring the NVIDIA build.
+
+Do not reuse a CMake cache configured with MSVC 14.51.
+
+## CUDA provider disappeared from Python ONNX Runtime
+
+Check:
 
 ```powershell
-$TensorRtDllDirs = @(
-    Get-ChildItem `
-        -LiteralPath $env:EDGE_TENSORRT_ROOT `
-        -Recurse `
-        -File `
-        -Filter "*.dll" |
-    ForEach-Object { $_.Directory.FullName } |
-    Sort-Object -Unique
-)
-
-$env:PATH = (
-    ($TensorRtDllDirs + @($env:PATH)) |
-    Select-Object -Unique
-) -join ";"
-
-where.exe nvonnxparser_10.dll
-where.exe nvinfer_10.dll
-where.exe nvinfer_plugin_10.dll
+python -c "import onnxruntime as ort; print(ort.get_available_providers())"
 ```
 
-If the parser DLL cannot be found anywhere under the TensorRT root, the Windows TensorRT package is incomplete.
+When only CPU is listed, remove both ORT packages and reinstall the GPU wheel:
+
+```powershell
+python -m pip uninstall -y `
+    onnxruntime `
+    onnxruntime-gpu
+
+python -m pip install `
+    --no-cache-dir `
+    --force-reinstall `
+    --no-deps `
+    onnxruntime-gpu==1.27.0
+```
+
+Restore pinned shared dependencies:
+
+```powershell
+python -m pip install `
+    --no-cache-dir `
+    --force-reinstall `
+    numpy==2.2.6 `
+    protobuf==6.33.6
+```
+
+Validate:
+
+```powershell
+python -m pip check
+```
 
 ## ORT CUDA works but ORT TensorRT fails
 
-ORT CUDA and ORT TensorRT have different transitive dependencies. A successful CUDA-provider run confirms cuDNN/CUDA loading, but ORT TensorRT additionally requires TensorRT runtime and parser DLLs.
+ORT CUDA and ORT TensorRT require different transitive runtime libraries.
 
-Check all of these:
+Confirm:
 
 ```powershell
 where.exe cudnn64_9.dll
@@ -1001,138 +1639,131 @@ where.exe nvonnxparser_10.dll
 
 ## TensorRT engine deserialization fails
 
-TensorRT engines are runtime- and hardware-specific. Rebuild the engine when the GPU architecture, TensorRT version, CUDA stack, operating system, or engine build configuration changes.
-
-## `No tests were found!!!`
-
-The release benchmark configuration currently uses `EDGE_BUILD_TESTS=OFF`. See [CTest interpretation](#ctest-interpretation).
-
-## LF/CRLF warnings
-
-Messages such as:
+Rebuild the engine for the current:
 
 ```text
-LF will be replaced by CRLF the next time Git touches it
-```
-
-are line-ending warnings, not build errors.
-
-Use:
-
-```powershell
-git diff --check
-```
-
-to detect actual whitespace errors before committing.
-
-## Stale CMake cache
-
-Delete and reconfigure the build tree after changing dependency roots or compiler/toolkit versions:
-
-```powershell
-Remove-Item -Recurse -Force build-final
-```
-
-Then rerun the configure command from the Quick Start section.
-
-## Benchmark numbers differ from the table
-
-The published table used 32 preloaded BDD100K frames, 30/300 warm-up/measured iterations for latency, and 50/1000 for throughput. Quick-start and pre-commit smoke tests intentionally use much smaller counts and are not performance measurements.
-
-
-# Docker
-
-The Dockerfile provides a Linux GPU build path. TensorRT engines must be rebuilt for the Linux runtime and target GPU.
-
-```powershell
-docker build `
-    --build-arg CUDA_ARCHITECTURES=75 `
-    --tag edge-perception-cpp:latest `
-    .
-```
-
-Example:
-
-```powershell
-docker run --rm --gpus all `
-    --volume "${PWD}\models:/workspace/models:ro" `
-    --volume "${PWD}\samples:/workspace/inputs:ro" `
-    --volume "${PWD}\outputs:/workspace/outputs" `
-    edge-perception-cpp:latest `
-    --mode infer `
-    --source /workspace/inputs/frame.jpg `
-    --backend fused-trt `
-    --model /workspace/models/engine/yolo26m_bdd100k_fp16.engine `
-    --precision fp16 `
-    --pipeline-depth 1 `
-    --output-dir /workspace/outputs
-```
-
-The host must provide a compatible NVIDIA driver and NVIDIA Container Toolkit.
-
-# Reproducibility
-
-Record for every publishable run:
-
-```text
-Git commit and working-tree state
 operating system
-CPU
 GPU
-NVIDIA driver
-compiler and toolset
-CUDA runtime/toolkit versions
-cuDNN version
 TensorRT version
-ONNX Runtime version
-OpenCV version
-artifact path, size, and SHA-256
-executable SHA-256
-source SHA-256
-precision
-backend
-pipeline depth
-CUDA graph state
-GPU postprocessing state
-warm-up and measured counts
-timing scope
-source-frame set
-fast-math state
+CUDA stack
+driver/runtime combination
+engine configuration
 ```
 
-The July 23 benchmark was executed from a dirty working tree and then repaired by rerunning the ORT TensorRT subset with the corrected executable. This is transparently recorded in the archive. The measured results are valid for that development state, but a future formal release benchmark should be generated from a clean tagged commit.
+## Docker cannot access the GPU
 
-The repaired benchmark metadata records:
+On Windows, ensure Docker Desktop uses its WSL 2 backend and that the NVIDIA driver supports WSL GPU compute.
+
+Verify:
+
+```powershell
+docker run `
+    --rm `
+    --gpus all `
+    nvcr.io/nvidia/tensorrt:25.03-py3 `
+    nvidia-smi
+```
+
+## Docker build sends several gigabytes
+
+Confirm `.dockerignore` exists at the repository root.
+
+The build context must exclude:
 
 ```text
-src/inference_engine.cpp SHA-256:
-deb35b762f88d2dfb7aa93389e48e67681eee7244d7c3a1a5dd1015686da69c8
+data/raw
+models
+runs
+mlruns
+build directories
+benchmarks
+outputs
+virtual environments
 ```
 
-The source file in this finalized repository package preserves that exact benchmarked byte sequence.
+---
 
-# Known boundaries
+# Known limitations
 
-The repository does not bundle:
+- TensorRT engines are not portable across arbitrary targets.
+- The Linux Docker image does not reuse Windows `.engine` files.
+- FP16 is the recommended deployment precision for the validated RTX 2060 path.
+- The tested INT8 artifacts did not provide the desired deployment quality/performance balance.
+- The project does not implement NVDEC.
+- The project does not implement DeepStream.
+- The project does not implement GStreamer camera integration.
+- The project does not implement multi-camera synchronization.
+- The project does not implement automotive safety certification.
+- GPU CI requires a self-hosted NVIDIA runner or another GPU-enabled CI service.
+- Public CPU CI does not validate native TensorRT or fused CUDA execution.
 
-- BDD100K;
-- trained weights or exported model binaries;
-- proprietary or redistributable-restricted SDK binaries;
-- NVIDIA drivers;
-- Visual Studio Build Tools;
-- CUDA, cuDNN, TensorRT, ONNX Runtime, or OpenCV installations;
-- a universal TensorRT engine compatible with every GPU and runtime;
-- NVDEC, DeepStream, GStreamer, or vendor-camera acquisition code;
-- a validated real-time CPU deployment path for YOLO26M;
-- a validated production INT8 deployment artifact;
-- registered CTest targets in the maximum-performance release configuration.
+---
 
-The fused device-image API accepts CUDA BGR, RGB, and NV12 surfaces so a future decoder can connect without redesigning the inference layer.
+# Recommended deployment description
+
+> Cross-platform C++17 object-detection deployment runtime with automatic ONNX Runtime backend selection, universal CPU fallback, optional CUDA and TensorRT acceleration, target-specific TensorRT engine generation, Python/C++ parity testing, reproducible benchmarking, registered automated tests and Windows/Linux build validation.
+
+---
+
+# Resume summary
+
+> Built a cross-platform YOLO26M deployment runtime in C++17 with portable ONNX CPU inference, automatic CUDA/TensorRT acceleration, target-specific TensorRT engine generation, regression-tested Python/C++ parity, persistent GPU I/O binding, CUDA Graph execution and a fused CUDA pipeline reaching approximately 254 FPS on an RTX 2060.
+
+---
+
+# Release checklist
+
+Before publishing a release:
+
+```text
+[ ] git diff --check passes
+[ ] Python syntax checks pass
+[ ] Python parity unit tests pass
+[ ] CPU configure succeeds
+[ ] CPU build succeeds
+[ ] CPU CTest passes 4/4
+[ ] NVIDIA configure succeeds
+[ ] NVIDIA build succeeds
+[ ] NVIDIA CTest passes 4/4
+[ ] real PyTorch → ONNX → C++ parity passes
+[ ] automatic CPU fallback selects ort_cpu
+[ ] ONNX Runtime GPU exposes CUDA and TensorRT providers
+[ ] Python dependency check passes
+[ ] Docker image builds
+[ ] Docker CPU smoke test passes
+[ ] Docker ORT CUDA smoke test passes
+[ ] Docker ORT TensorRT smoke test passes
+[ ] Linux TensorRT engine is built inside the container
+[ ] Docker fused TensorRT smoke test passes
+[ ] Docker image is pushed
+[ ] GitHub CPU CI passes on Windows and Ubuntu
+[ ] release tag is created
+```
+
+---
 
 # References
 
-- [ONNX Runtime CUDA Execution Provider](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
-- [ONNX Runtime TensorRT Execution Provider](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html)
-- [NVIDIA TensorRT documentation](https://docs.nvidia.com/deeplearning/tensorrt/)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- [BDD100K](https://www.bdd100k.com/)
+- NVIDIA TensorRT container release notes:
+  https://docs.nvidia.com/deeplearning/frameworks/container-release-notes/index.html
+
+- NVIDIA NGC authentication:
+  https://docs.nvidia.com/ngc/latest/ngc-catalog-user-guide.html
+
+- Docker Desktop GPU support:
+  https://docs.docker.com/desktop/features/gpu/
+
+- NVIDIA Container Toolkit:
+  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/
+
+- ONNX Runtime:
+  https://onnxruntime.ai/
+
+- TensorRT:
+  https://developer.nvidia.com/tensorrt
+
+- OpenCV:
+  https://opencv.org/
+
+- BDD100K:
+  https://bdd-data.berkeley.edu/

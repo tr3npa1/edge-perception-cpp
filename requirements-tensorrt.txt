@@ -1,5 +1,8 @@
---extra-index-url https://pypi.nvidia.com
+# Optional target-machine TensorRT export environment.
+#
+# TensorRT Python bindings are intentionally not pinned here because their
+# installation source is OS, CUDA, Python, and NVIDIA-distribution specific.
+# Install the TensorRT 10.9 Python bindings supplied with the target SDK or
+# container, verify `python -c "import tensorrt"`, then install this file.
 
-# Optional dependency group for TensorRT export / engine loading.
-# Install this only in environments where native TensorRT artifacts are needed.
-tensorrt
+-r requirements-gpu.txt

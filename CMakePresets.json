@@ -1,0 +1,92 @@
+{
+  "version": 5,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "EDGE_COPY_RUNTIME_DLLS": "ON",
+        "EDGE_WARNINGS_AS_ERRORS": "OFF",
+        "EDGE_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "cpu-release",
+      "displayName": "Portable CPU Release",
+      "description": "Portable ONNX Runtime CPU build with C++ and Python tests",
+      "inherits": "base",
+      "cacheVariables": {
+        "EDGE_ENABLE_TENSORRT": "OFF",
+        "EDGE_ENABLE_CUDA_PIPELINE": "OFF",
+        "EDGE_BUILD_TESTS": "ON",
+        "EDGE_BUILD_PYTHON_TESTS": "ON",
+        "EDGE_ENABLE_NATIVE_ARCH": "OFF",
+        "EDGE_ENABLE_IPO": "ON",
+        "EDGE_ENABLE_FAST_MATH": "OFF"
+      }
+    },
+    {
+      "name": "nvidia-release",
+      "displayName": "NVIDIA Accelerated Release",
+      "description": "ORT plus native/fused TensorRT build; paths are read from EDGE_* environment variables",
+      "inherits": "base",
+      "cacheVariables": {
+        "EDGE_ENABLE_TENSORRT": "ON",
+        "EDGE_ENABLE_CUDA_PIPELINE": "ON",
+        "EDGE_BUILD_TESTS": "ON",
+        "EDGE_BUILD_PYTHON_TESTS": "ON",
+        "EDGE_ENABLE_NATIVE_ARCH": "OFF",
+        "EDGE_ENABLE_IPO": "OFF",
+        "EDGE_ENABLE_FAST_MATH": "OFF",
+        "CMAKE_CUDA_ARCHITECTURES": "native"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "cpu-release",
+      "configurePreset": "cpu-release",
+      "configuration": "Release",
+      "jobs": 4
+    },
+    {
+      "name": "nvidia-release",
+      "configurePreset": "nvidia-release",
+      "configuration": "Release",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "cpu-release",
+      "configurePreset": "cpu-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "nvidia-release",
+      "configurePreset": "nvidia-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    }
+  ]
+}

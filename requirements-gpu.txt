@@ -1,0 +1,9 @@
+# CUDA 13 training/export/evaluation environment used by the NVIDIA build.
+--index-url https://download.pytorch.org/whl/cu130
+--extra-index-url https://pypi.org/simple
+
+torch==2.12.1
+torchvision==0.27.1
+onnxruntime-gpu==1.27.0
+
+-r requirements-common.txt

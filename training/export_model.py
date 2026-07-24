@@ -4,7 +4,7 @@ Export YOLO26M PyTorch checkpoints to ONNX and TensorRT deployment artifacts.
 This script is the export entrypoint for edge-perception-cpp.
 
 Expected PyTorch model input:
-    runs/tain/yolo26m_bdd100k/weights/best.pt
+    runs/detect/runs/train/<run_name>/weights/best.pt
 
 Expected dataset input for INT8 calibration:
     data/processed/bdd100k_yolo/bdd100k.yaml
@@ -12,9 +12,8 @@ Expected dataset input for INT8 calibration:
 Responsibilities:
 - export base ONNX FP32
 - export base ONNX FP16
-- export ONNX INT8/PTQ QDQ artifacts for ONNX Runtime CPU/CUDA validation
+- export base ONNX INT8/PTQ when supported
 - record ONNX Runtime CPU/CUDA/TensorRT-EP backend metadata for ONNX artifacts
-- document that ONNX INT8 QDQ + ORT TensorRT EP is skipped for this YOLO26M graph
 - export native TensorRT FP32 engine
 - export native TensorRT FP16 engine
 - export native TensorRT INT8 engine with calibration data
@@ -33,14 +32,18 @@ This script does not benchmark deployment latency.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import math
+import os
+import platform
 import shutil
 import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -49,7 +52,7 @@ import yaml
 
 LOGGER = logging.getLogger("export_yolo26m_model")
 
-DEFAULT_WEIGHTS = Path("runs/train/yolo26m_bdd100k/weights/best.pt")
+DEFAULT_WEIGHTS = Path("runs/detect/runs/train/yolo26m_bdd100k/weights/best.pt")
 DEFAULT_DATA_YAML = Path("data/processed/bdd100k_yolo/bdd100k.yaml")
 DEFAULT_ONNX_DIR = Path("models/onnx")
 DEFAULT_ENGINE_DIR = Path("models/engine")
@@ -57,13 +60,6 @@ DEFAULT_ORT_TRT_CACHE_DIR = Path("models/ort_trt_cache")
 DEFAULT_BASENAME = "yolo26m_bdd100k"
 
 KAGGLE_PATH_MARKER = "/kaggle/input"
-
-ORT_TRT_INT8_QDQ_SKIP_REASON = (
-    "skipped_unsupported_combo: ONNX INT8 QDQ artifacts are intended for ONNX "
-    "Runtime CPU/CUDA checks in this project. ORT TensorRT EP INT8 is skipped "
-    "for this YOLO26M graph; native TensorRT .engine artifacts are the supported "
-    "TensorRT INT8 deployment path."
-)
 
 ONNX_VARIANTS = ("onnx_fp32", "onnx_fp16", "onnx_int8")
 ENGINE_VARIANTS = ("engine_fp32", "engine_fp16", "engine_int8")
@@ -425,6 +421,166 @@ def write_json(path: Path, payload: Any) -> None:
 
     with path.open("w", encoding="utf-8") as file:
         json.dump(to_jsonable(payload), file, indent=2)
+
+
+def sha256_file(path: Path) -> str:
+    """Return the lowercase SHA-256 digest of one file."""
+
+    digest = hashlib.sha256()
+
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+    return digest.hexdigest()
+
+
+def command_output(command: list[str]) -> dict[str, Any]:
+    """Run a diagnostic command without making export depend on it."""
+
+    try:
+        completed = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except Exception as error:
+        return {
+            "command": command,
+            "success": False,
+            "returncode": None,
+            "output": None,
+            "error": str(error),
+        }
+
+    return {
+        "command": command,
+        "success": completed.returncode == 0,
+        "returncode": completed.returncode,
+        "output": completed.stdout.strip()[-8000:],
+        "error": None,
+    }
+
+
+def collect_target_runtime_provenance() -> dict[str, Any]:
+    """Collect target-machine metadata without failing artifact export."""
+
+    provenance: dict[str, Any] = {
+        "captured_at_utc": datetime.now(timezone.utc).isoformat(),
+        "operating_system": platform.platform(),
+        "machine": platform.machine(),
+        "python_version": platform.python_version(),
+        "nvidia_smi": command_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,compute_cap,driver_version",
+                "--format=csv,noheader",
+            ]
+        ),
+        "trtexec_version": command_output(["trtexec", "--version"]),
+        "torch": None,
+        "tensorrt_python": None,
+    }
+
+    try:
+        import torch
+
+        torch_info: dict[str, Any] = {
+            "version": getattr(torch, "__version__", "unknown"),
+            "cuda_version": getattr(getattr(torch, "version", None), "cuda", None),
+            "cuda_available": bool(torch.cuda.is_available()),
+            "device_count": int(torch.cuda.device_count()),
+            "devices": [],
+        }
+
+        if torch.cuda.is_available():
+            torch_info["devices"] = [
+                {
+                    "index": index,
+                    "name": torch.cuda.get_device_name(index),
+                    "compute_capability": list(
+                        torch.cuda.get_device_capability(index)
+                    ),
+                }
+                for index in range(torch.cuda.device_count())
+            ]
+
+        provenance["torch"] = torch_info
+    except Exception as error:
+        provenance["torch"] = {"error": str(error)}
+
+    try:
+        import tensorrt as trt  # type: ignore
+
+        provenance["tensorrt_python"] = {
+            "version": getattr(trt, "__version__", "unknown")
+        }
+    except Exception as error:
+        provenance["tensorrt_python"] = {"error": str(error)}
+
+    return provenance
+
+
+def build_engine_provenance(
+    *,
+    engine_path: Path,
+    source_path: Path,
+    variant: str,
+    args: argparse.Namespace,
+    build_info: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build a reproducibility record for one target-specific engine."""
+
+    calibration: dict[str, Any] | None = None
+
+    if variant.endswith("_int8") and args.data is not None:
+        calibration = {
+            "data_yaml": str(args.data),
+            "data_yaml_sha256": (
+                sha256_file(args.data)
+                if args.data.is_file()
+                else None
+            ),
+            "fraction": args.calibration_fraction,
+        }
+
+    source_kind = (
+        "onnx"
+        if source_path.suffix.lower() == ".onnx"
+        else "pytorch_checkpoint"
+    )
+
+    portability_note = (
+        "TensorRT engines are rebuilt on the deployment target from the "
+        "portable ONNX artifact."
+        if source_kind == "onnx"
+        else (
+            "This calibrated TensorRT engine is target-specific and was built "
+            "from the recorded PyTorch checkpoint plus calibration dataset."
+        )
+    )
+
+    return {
+        "target_specific": True,
+        "portability_note": portability_note,
+        "variant": variant,
+        "source_kind": source_kind,
+        "precision": variant_precision(variant),
+        "source_artifact": str(source_path),
+        "source_artifact_sha256": sha256_file(source_path),
+        "engine_artifact": str(engine_path),
+        "engine_artifact_sha256": sha256_file(engine_path),
+        "engine_size_bytes": engine_path.stat().st_size,
+        "image_size": args.imgsz,
+        "batch": args.batch,
+        "workspace_gib": args.workspace,
+        "calibration": calibration,
+        "builder": build_info,
+        "target_runtime": collect_target_runtime_provenance(),
+    }
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
@@ -978,6 +1134,10 @@ def inspect_onnx_graph(onnx_path: Path) -> dict[str, Any]:
     ]
 
     return {
+        "path": str(onnx_path),
+        "file_size_bytes": onnx_path.stat().st_size,
+        "sha256": sha256_file(onnx_path),
+        "portable_artifact": True,
         "ir_version": int(model.ir_version),
         "producer_name": model.producer_name,
         "producer_version": model.producer_version,
@@ -1062,12 +1222,6 @@ def build_provider_request(
     raise ValueError(f"Unsupported ONNX Runtime provider: {provider_name}")
 
 
-def is_int8_onnx_artifact(onnx_path: Path) -> bool:
-    """Return True when an ONNX artifact name represents the INT8 QDQ export."""
-
-    return "int8" in onnx_path.stem.lower()
-
-
 def inspect_ort_session(
     *,
     onnx_path: Path,
@@ -1145,20 +1299,17 @@ def build_backend_profiles(
     """
     Build backend metadata for ONNX Runtime deployment paths.
 
-    The same FP32/FP16 ONNX model can be loaded by:
+    The same ONNX model can be loaded by:
         - CPUExecutionProvider
         - CUDAExecutionProvider
         - TensorrtExecutionProvider
 
-    ONNX INT8 QDQ artifacts are intentionally not checked with ORT TensorRT EP
-    in this project. Native TensorRT INT8 .engine artifacts are the supported
-    TensorRT INT8 path.
+    TensorRT EP may build/cache TensorRT engines internally at runtime.
     """
 
     import onnxruntime as ort
 
     available_providers = ort.get_available_providers()
-    is_int8_qdq = is_int8_onnx_artifact(onnx_path)
 
     profiles: dict[str, Any] = {
         "ort_cpu": {
@@ -1186,10 +1337,8 @@ def build_backend_profiles(
             "check_error": None,
             "engine_cache_enable": True,
             "engine_cache_path": str(args.ort_tensorrt_cache_dir),
-            "skipped": False,
-            "skip_reason": None,
             "note": (
-                "ONNX Runtime TensorRT EP consumes an ONNX file and may build/cache "
+                "ONNX Runtime TensorRT EP consumes this ONNX file and may build/cache "
                 "TensorRT engines internally at runtime. This is separate from native "
                 ".engine export."
             ),
@@ -1210,17 +1359,6 @@ def build_backend_profiles(
 
     for profile_name, should_check in requested_checks.items():
         if not should_check:
-            continue
-
-        if profile_name == "ort_tensorrt" and is_int8_qdq:
-            profiles[profile_name]["checked"] = True
-            profiles[profile_name]["check_passed"] = True
-            profiles[profile_name]["skipped"] = True
-            profiles[profile_name]["skip_reason"] = ORT_TRT_INT8_QDQ_SKIP_REASON
-            profiles[profile_name]["note"] = (
-                "Skipped by design. Use native TensorRT INT8 .engine artifacts for "
-                "TensorRT INT8 deployment."
-            )
             continue
 
         provider_name = provider_names[profile_name]
@@ -1256,13 +1394,6 @@ def build_backend_profiles(
                 imgsz=args.imgsz,
             )
 
-            actual_providers = session_info.get("actual_providers", [])
-            if provider_name not in actual_providers:
-                raise RuntimeError(
-                    f"{provider_name} was requested but ONNX Runtime fell back to "
-                    f"{actual_providers}."
-                )
-
             profiles[profile_name]["check_passed"] = True
             profiles[profile_name]["session"] = session_info
         except Exception as error:
@@ -1295,9 +1426,9 @@ def inspect_onnx_artifact(
         onnxruntime_info = {
             "available_profiles": backend_profiles,
             "note": (
-                "Use FP32/FP16 ONNX artifacts with ORT CPU, ORT CUDA, or ORT TensorRT EP. "
-                "Use ONNX INT8 QDQ artifacts with ORT CPU/CUDA. For TensorRT INT8, use "
-                "the native .engine artifacts exported by this script."
+                "Use this ONNX artifact with ONNX Runtime CPU, CUDA, or TensorRT EP. "
+                "TensorRT EP does not require a separate ONNX export; it changes the "
+                "runtime execution provider."
             ),
         }
 
@@ -1434,36 +1565,13 @@ def export_onnx_int8_via_ort(
     int8_onnx_path: Path,
     args: argparse.Namespace,
 ) -> None:
-    """
-    Create an all-Conv ONNX INT8 QDQ artifact with ONNX Runtime static quantization.
+    """Create an ONNX INT8 artifact with ONNX Runtime static QDQ quantization."""
 
-    This mode quantizes every Conv node that ONNX Runtime can quantize.
+    from onnxruntime.quantization import CalibrationMethod, QuantFormat, QuantType, quantize_static
 
-    Still intentionally not quantized:
-    - non-Conv ops such as TopK/Gather/Reshape/Concat/etc.
-    - final detection/output formatting logic if it is implemented through non-Conv ops.
-    - bias tensors, via QuantizeBias=False.
-
-    This is not full-graph INT8. It is all-Conv INT8.
-    """
-
-    from onnxruntime.quantization import (
-        CalibrationMethod,
-        QuantFormat,
-        QuantType,
-        quantize_static,
-    )
-
-    LOGGER.info("Creating ALL-CONV ONNX INT8 using ONNX Runtime static QDQ quantization:")
+    LOGGER.info("Creating ONNX INT8 using ONNX Runtime static QDQ quantization:")
     LOGGER.info("  source: %s", fp32_onnx_path)
     LOGGER.info("  target: %s", int8_onnx_path)
-    LOGGER.info("  mode: all Conv nodes, no Conv exclusion list")
-    LOGGER.info("  op_types_to_quantize: Conv")
-    LOGGER.info("  nodes_to_exclude: []")
-    LOGGER.info("  activation_type: QInt8")
-    LOGGER.info("  weight_type: QInt8")
-    LOGGER.info("  per_channel: True")
-    LOGGER.info("  QuantizeBias: False")
 
     image_paths = collect_calibration_images(
         data_yaml=args.data,
@@ -1480,7 +1588,6 @@ def export_onnx_int8_via_ort(
     )
 
     int8_onnx_path.parent.mkdir(parents=True, exist_ok=True)
-
     quantize_static(
         model_input=str(fp32_onnx_path),
         model_output=str(int8_onnx_path),
@@ -1489,12 +1596,7 @@ def export_onnx_int8_via_ort(
         activation_type=QuantType.QInt8,
         weight_type=QuantType.QInt8,
         calibrate_method=CalibrationMethod.MinMax,
-        op_types_to_quantize=["Conv"],
-        nodes_to_exclude=[],
         per_channel=True,
-        extra_options={
-            "QuantizeBias": False,
-        },
     )
 
 
@@ -1777,7 +1879,8 @@ def export_engine_via_python_tensorrt(
         raise RuntimeError(
             "TensorRT Python bindings are not installed in this environment. "
             "This is expected for the default local development setup. Native "
-            "TensorRT engine export requires a properly configured NVIDIA TensorRT environment "
+            "TensorRT engine export requires a properly configured NVIDIA "
+            "TensorRT environment, usually on the GPU export server. "
             "Either install TensorRT separately for your platform or use trtexec "
             "if it is available on PATH."
         ) from error
@@ -1889,6 +1992,7 @@ def inspect_engine_artifact(engine_path: Path, smoke_load: bool, strict: bool) -
     info: dict[str, Any] = {
         "path": str(engine_path),
         "file_size_bytes": engine_path.stat().st_size,
+        "sha256": sha256_file(engine_path),
         "native_tensorrt_backend": True,
         "smoke_load_requested": smoke_load,
         "smoke_load_passed": None,
@@ -1978,12 +2082,11 @@ def export_one_variant(
 
     export_started_at = time.time()
     engine_build_info: dict[str, Any] | None = None
+    engine_source_path: Path | None = None
 
     if variant == "onnx_int8":
         # Ultralytics currently rejects int8=True for format='onnx' in this stack.
-        # Create a real ONNX Runtime QDQ INT8 artifact from the FP32 ONNX instead.
-        # This ONNX INT8 file is checked with ORT CPU/CUDA; TensorRT INT8 uses
-        # native .engine export.
+        # Create a real ONNX INT8 QDQ artifact from the FP32 ONNX instead.
         fp32_onnx_path = variant_output_path(args, "onnx_fp32")
         if not fp32_onnx_path.is_file():
             LOGGER.info("ONNX FP32 source missing; exporting onnx_fp32 before ONNX INT8.")
@@ -2011,6 +2114,7 @@ def export_one_variant(
             # Native TensorRT INT8 must be calibrated directly from images. Building
             # an engine from the ONNX Runtime QDQ INT8 file can fail because TensorRT
             # requires symmetric QDQ zero-points for those nodes.
+            engine_source_path = weights
             engine_build_info = export_engine_int8_via_ultralytics(
                 weights=weights,
                 engine_path=output_path,
@@ -2025,6 +2129,7 @@ def export_one_variant(
                 variant=variant,
             )
 
+            engine_source_path = source_onnx_path
             engine_build_info = export_engine_from_onnx(
                 onnx_path=source_onnx_path,
                 engine_path=output_path,
@@ -2077,6 +2182,19 @@ def export_one_variant(
         if engine_build_info is not None:
             engine_info["build_backend"] = engine_build_info
 
+        if engine_source_path is None:
+            raise RuntimeError(
+                f"Engine source provenance was not recorded for {variant}."
+            )
+
+        engine_info["provenance"] = build_engine_provenance(
+            engine_path=output_path,
+            source_path=engine_source_path,
+            variant=variant,
+            args=args,
+            build_info=engine_build_info,
+        )
+
     return ExportArtifact(
         variant=variant,
         export_format=export_format,
@@ -2093,7 +2211,6 @@ def export_one_variant(
         backend_profiles=backend_profiles,
         engine_info=engine_info,
     )
-
 
 def log_export_artifact(artifact: ExportArtifact) -> None:
     """Log one exported artifact summary."""

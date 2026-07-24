@@ -9,6 +9,7 @@ dist/
 site/
 .python-version
 .venv/
+.venv*
 venv/
 env/
 ENV/

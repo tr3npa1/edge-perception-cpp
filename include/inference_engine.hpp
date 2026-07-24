@@ -521,6 +521,30 @@ public:
     [[nodiscard]] std::uint64_t completed_run_count() const noexcept;
 
     /**
+     * @brief Return the execution providers compiled into the linked
+     *        ONNX Runtime package.
+     *
+     * This reports provider registration capability only. A CUDA or TensorRT
+     * provider can still fail during session construction when a transitive
+     * runtime DLL/shared library, compatible driver, GPU, or provider-specific
+     * dependency is unavailable. Automatic backend selection must therefore
+     * treat this list as a preflight hint and still catch construction errors.
+     */
+    [[nodiscard]] static std::vector<std::string>
+    available_onnxruntime_providers();
+
+    /**
+     * @brief Return true when ONNX Runtime advertises one provider name.
+     *
+     * The comparison is exact and uses ONNX Runtime names such as
+     * "CPUExecutionProvider", "CUDAExecutionProvider", and
+     * "TensorrtExecutionProvider".
+     */
+    [[nodiscard]] static bool onnxruntime_provider_is_available(
+        std::string_view provider_name
+    );
+
+    /**
      * @brief Return whether native TensorRT support was compiled into this
      *        project binary.
      *
