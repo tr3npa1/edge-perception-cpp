@@ -1,7 +1,7 @@
-# edge-perception-cpp — maximum practical pre-benchmark optimization audit
+# edge-perception-cpp optimization architecture
 
-This package is a drop-in optimized core for the files completed before
-`benchmark.hpp/.cpp`, `main.cpp`, and the final C++ tests.
+This document records the performance-oriented design of the completed native
+runtime and the boundaries of its optimized execution paths.
 
 It contains the original generic CPU/ONNX Runtime/native-TensorRT path and a
 second, specialized native TensorRT fast path designed for the lowest practical
@@ -196,9 +196,8 @@ addresses. Capture failure falls back to the ordinary asynchronous path unless
 - optional fast math for separately labelled speed experiments;
 - explicit CUDA architecture selection;
 - conditional CUDA language activation;
-- core-only configuration succeeds before benchmark/main/test files exist;
-- future benchmark, application, and test sources are incorporated
-  automatically when those finalized files are added.
+- separate portable CPU and NVIDIA-accelerated build profiles;
+- integrated command-line, benchmark, and test targets.
 
 ## Deliberate boundaries
 
@@ -220,17 +219,10 @@ copies in the current inference core. The device BGR/RGB/NV12 API is already
 present so an eventual decoder can feed the optimized path without redesigning
 the inference layer.
 
-## Validation completed in this package
+## Validation expectations
 
-- Public-header C++17 strict-warning compilation.
-- `gpu_pipeline_common.cpp`, `gpu_pipeline_stub.cpp`, and `postprocess.cpp`
-  strict-warning compilation.
-- CUDA translation-unit host/API syntax parsing for the enabled TensorRT branch
-  against API-shaped CUDA 12/TensorRT 10/OpenCV stubs.
-- CMake configure and generate test for the core-only non-TensorRT build.
-- Archive integrity test and SHA-256 manifest generation.
-
-This environment cannot perform the final MSVC + NVCC + real TensorRT 10.9 +
-RTX 2060 build or execute GPU kernels. Real compilation, parity tests, and
-latency measurement on the target Windows machine remain required before any
-performance claim is made.
+Release validation must include the portable CPU build and CTest suite, the
+real MSVC/NVCC/TensorRT build on the target NVIDIA machine, Python parity
+tests, and representative runtime smoke tests. Performance claims require
+measurements on the named hardware and software stack; they must not be
+inferred from compilation alone.

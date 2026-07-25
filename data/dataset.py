@@ -89,7 +89,7 @@ def setup_logging() -> None:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    
+
     parser = argparse.ArgumentParser(
         description="Validate YOLO-format BDD100K and write a clean training YAML."
     )
@@ -159,14 +159,14 @@ def read_yaml(path: Path) -> dict[str, Any]:
     """Read a YAML file and return a dictionary"""
 
     if not path.is_file():
-        raise FileNotFoundError(f"YAML file not found: {path}" )
-    
+        raise FileNotFoundError(f"YAML file not found: {path}")
+
     with path.open("r", encoding="utf-8") as file:
         payload = yaml.safe_load(file)
 
     if not isinstance(payload, dict):
         raise ValueError(f"Expected YAML object in {path}, got {type(payload).__name__}")
-    
+
     return payload
 
 
@@ -244,9 +244,9 @@ def normalize_class_names(names_payload: Any) -> list[str]:
 
         if not names:
             raise ValueError("The YAML names list is empty")
-        
+
         return names
-    
+
     if isinstance(names_payload, dict):
         class_names_by_id: dict[int, str] = {}
 
@@ -255,12 +255,12 @@ def normalize_class_names(names_payload: Any) -> list[str]:
                 class_id = int(key)
             except ValueError as error:
                 raise ValueError(f"Class key is not an integer: {key}") from error
-            
+
             class_names_by_id[class_id] = str(value)
 
         if not class_names_by_id:
             raise ValueError("The YAML 'names' dictionary is empty.")
-        
+
         actual_ids = sorted(class_names_by_id)
         expected_ids = list(range(len(class_names_by_id)))
 
@@ -313,25 +313,25 @@ def resolve_yaml_base_dir(source_yaml: Path, yaml_payload: dict[str, Any]) -> Pa
 
     if raw_base is None:
         return source_yaml.parent.resolve()
-    
+
     base_path = Path(str(raw_base))
 
     if base_path.is_absolute():
         return base_path.resolve()
-    
+
     return (source_yaml.parent / base_path).resolve()
 
 
 def resolve_path_entry(entry: Any, base_dir: Path) -> list[Path]:
     """Resolve a YAML split entry into absolute paths."""
-    
+
     if entry is None:
         return []
-    
+
     if isinstance(entry, str):
         path = Path(entry)
         return [path.resolve() if path.is_absolute() else (base_dir / path).resolve()]
-    
+
     if isinstance(entry, list):
         resolved_paths: list[Path] = []
 
@@ -341,14 +341,14 @@ def resolve_path_entry(entry: Any, base_dir: Path) -> list[Path]:
                     "Split path lists must contain strings only. "
                     f"Got {type(item).__name__}."
                 )
-            
+
             path = Path(item)
             resolved_paths.append(
                 path.resolve() if path.is_absolute() else (base_dir / path).resolve()
             )
 
         return resolved_paths
-    
+
     raise ValueError(
         "Dataset YAML split entries must be strings or lists of strings. "
         f"Got {type(entry).__name__}."
@@ -373,11 +373,11 @@ def infer_split_paths(dataset_dir: Path, split: str) -> list[Path]:
                 dataset_dir / split_name,
             ]
         )
-    
+
     for candidate in candidates:
         if candidate.is_dir():
             return [candidate.resolve()]
-        
+
     return []
 
 
@@ -447,7 +447,7 @@ def get_split_roots(
     """
 
     base_dir = resolve_yaml_base_dir(source_yaml, yaml_payload)
-    
+
     if split == "val":
         entry = yaml_payload.get("val", yaml_payload.get("valid"))
     else:
@@ -457,24 +457,24 @@ def get_split_roots(
 
     if yaml_roots and collect_images(yaml_roots):
         return yaml_roots
-    
+
     inferred_roots = infer_split_paths(dataset_dir, split)
 
     if inferred_roots and collect_images(inferred_roots):
         return inferred_roots
-    
+
     return yaml_roots or inferred_roots
 
 
 def replace_first_path_part(path: Path, old: str, new: str) -> Path | None:
     """Replace the first matching path component."""
-    
+
     parts = list(path.parts)
     for index, part in enumerate(parts):
         if part.lower() == old.lower():
             parts[index] = new
             return Path(*parts)
-    
+
     return None
 
 
@@ -493,7 +493,7 @@ def candidate_label_paths_for_image(image_path: Path) -> list[Path]:
 
     if label_path is None:
         return []
-    
+
     label_path = label_path.with_suffix(".txt")
     candidates = [label_path]
 
@@ -528,11 +528,11 @@ def resolve_label_path_for_image(image_path: Path) -> Path | None:
 
     if not candidates:
         return None
-    
+
     for candidate in candidates:
         if candidate.is_file():
             return candidate
-        
+
     return candidates[0]
 
 
@@ -556,29 +556,29 @@ def parse_label_line(
 
     if not stripped:
         return None
-    
+
     parts = stripped.split()
 
     if len(parts) != 5:
         return f"{label_path}:{line_number} expected 5 values got {len(parts)}."
-    
+
     try:
         class_id = int(float(parts[0]))
     except ValueError:
         return f"{label_path}:{line_number} invalid class_id: {parts[0]}"
-    
+
     if class_id < 0 or class_id >= class_count:
-        return(
+        return (
             f"{label_path}:{line_number} class id {class_id} outside "
             f"valid range [0,{class_count - 1}]."
         )
-    
+
     for token in parts[1:]:
         try:
             value = float(token)
         except ValueError:
             return f"{label_path}:{line_number} invalid box value: {token}"
-        
+
         if value < -1e-6 or value > 1.0 + 1e-6:
             return (
                 f"{label_path}:{line_number} normalized box value out of range: "
@@ -625,7 +625,7 @@ def validate_split(
     if not images:
         valid = False
         notes.append(f"No images found for split '{split}'.")
-    
+
     label_count = 0
     missing_labels: list[str] = []
     invalid_labels: list[str] = []
@@ -704,7 +704,7 @@ def make_yaml_path_entry(paths: list[Path], dataset_dir: Path) -> str | list[str
 
     if len(entries) == 1:
         return entries[0]
-    
+
     return entries
 
 

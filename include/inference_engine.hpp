@@ -261,7 +261,16 @@ struct OrtTensorRtConfig {
     };
 
     bool enable_context_memory_sharing = true;
+
+    // ORT TensorRT CUDA graphs require explicit device-bound input/output
+    // copies in this synchronous host-output API. That bridge currently uses
+    // the Windows CUDA runtime loader; other platforms keep the provider's
+    // ordinary synchronized host-tensor path.
+#if defined(_WIN32)
     bool enable_cuda_graph = true;
+#else
+    bool enable_cuda_graph = false;
+#endif
 
     int builder_optimization_level = 5;
     int auxiliary_streams = -1;

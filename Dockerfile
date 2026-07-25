@@ -124,7 +124,11 @@ ENV LD_LIBRARY_PATH=/opt/onnxruntime/lib:/usr/local/cuda/lib64:/usr/lib/x86_64-l
 
 WORKDIR /workspace/source
 
-COPY . .
+COPY CMakeLists.txt CMakePresets.json pytest.ini ./
+COPY include ./include
+COPY src ./src
+COPY tests ./tests
+COPY training ./training
 
 # -----------------------------------------------------------------------------
 # Configure

@@ -244,15 +244,17 @@ void test_postprocess_validation_and_restoration() {
     require_throws(
         [&postprocessor, &transform]() {
             edge::DetectionBuffer buffer{};
-            postprocessor.process(
-                edge::DetectionTensorView{
-                    nullptr,
-                    6U,
-                    1U,
-                    edge::kDetectionValueCount
-                },
-                transform,
-                buffer
+            static_cast<void>(
+                postprocessor.process(
+                    edge::DetectionTensorView{
+                        nullptr,
+                        6U,
+                        1U,
+                        edge::kDetectionValueCount
+                    },
+                    transform,
+                    buffer
+                )
             );
         },
         "Null non-empty output view must throw."

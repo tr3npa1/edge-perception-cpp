@@ -21,7 +21,7 @@ cmake -S . -B $Build -G Ninja `
     -DTENSORRT_ROOT="$env:EDGE_TENSORRT_ROOT" `
     -DEDGE_ENABLE_TENSORRT=ON `
     -DEDGE_ENABLE_CUDA_PIPELINE=ON `
-    -DEDGE_CUDA_ARCHITECTURES=75 `
+    -DCMAKE_CUDA_ARCHITECTURES=75 `
     -DEDGE_ENABLE_IPO=ON `
     -DEDGE_ENABLE_NATIVE_ARCH=ON `
     -DEDGE_ENABLE_FAST_MATH=OFF `
@@ -30,9 +30,9 @@ cmake -S . -B $Build -G Ninja `
 cmake --build $Build --config Release --parallel
 ```
 
-The current package can configure the core library before `main.cpp`, the
-benchmark module, and the final C++ test file exist. CMake automatically adds
-those targets when their finalized sources are created.
+This configuration builds the core library, command-line application, and
+fused CUDA/TensorRT implementation. Set `EDGE_BUILD_TESTS=ON` for a release
+acceptance build.
 
 ## Fast-math build
 
@@ -50,7 +50,7 @@ cmake -S . -B build-max-fast-math -G Ninja `
     -DTENSORRT_ROOT="$env:EDGE_TENSORRT_ROOT" `
     -DEDGE_ENABLE_TENSORRT=ON `
     -DEDGE_ENABLE_CUDA_PIPELINE=ON `
-    -DEDGE_CUDA_ARCHITECTURES=75 `
+    -DCMAKE_CUDA_ARCHITECTURES=75 `
     -DEDGE_ENABLE_IPO=ON `
     -DEDGE_ENABLE_NATIVE_ARCH=ON `
     -DEDGE_ENABLE_FAST_MATH=ON `

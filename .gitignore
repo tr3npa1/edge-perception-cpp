@@ -22,7 +22,9 @@ ENV/
 .tox/
 .nox/
 .coverage
+.coverage.*
 coverage.xml
+coverage/
 htmlcov/
 .ipynb_checkpoints/
 
@@ -33,6 +35,12 @@ htmlcov/
 kaggle.json
 .kaggle/
 **/kaggle.json
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets/
 
 # Editors, IDEs, operating systems, and local tooling
 .vscode/

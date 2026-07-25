@@ -58,4 +58,4 @@ Production deployment work is not about making every theoretical runtime combina
 4. validating accuracy per artifact,
 5. benchmarking end-to-end latency fairly.
 
-This matrix is the contract used by `training/evaluate.py`, the README, and the future C++ benchmark suite.
+This matrix is the contract used by `training/evaluate.py`, the README, and the C++ benchmark suite.

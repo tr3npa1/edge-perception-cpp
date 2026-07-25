@@ -1203,9 +1203,13 @@ void validate_frame(
         options.ort_cache_directory;
 
     // ORT TensorRT EP has a separate provider-controlled CUDA-graph option.
+#if defined(_WIN32)
     config.ort_tensorrt.enable_cuda_graph =
         options.enable_cuda_graph
         && config.backend == InferenceBackend::OrtTensorRt;
+#else
+    config.ort_tensorrt.enable_cuda_graph = false;
+#endif
 
     config.validate();
     return config;

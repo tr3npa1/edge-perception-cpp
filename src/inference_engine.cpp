@@ -16,7 +16,6 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
-#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -44,27 +43,6 @@ namespace edge {
 namespace {
 
 constexpr std::size_t kHostAlignment = 64U;
-constexpr std::uint32_t kOutputWriteSentinelBits = 0x7FC0D00DU;
-
-/**
- * @brief Return a quiet-NaN payload reserved for output-write verification.
- */
-[[nodiscard]] float output_write_sentinel() noexcept {
-    float value = 0.0F;
-    const std::uint32_t bits = kOutputWriteSentinelBits;
-
-    std::memcpy(&value, &bits, sizeof(value));
-    return value;
-}
-
-/**
- * @brief Return true when a float still contains the exact write sentinel.
- */
-[[nodiscard]] bool is_output_write_sentinel(float value) noexcept {
-    std::uint32_t bits = 0U;
-    std::memcpy(&bits, &value, sizeof(bits));
-    return bits == kOutputWriteSentinelBits;
-}
 
 /**
  * @brief Convert a filesystem path to UTF-8 for diagnostics and provider
@@ -669,13 +647,26 @@ private:
 };
 
 /**
- * @brief Return the process-wide ONNX Runtime environment.
+ * @brief Share one ONNX Runtime environment across live engine instances.
+ *
+ * The environment must be released after every session but before ORT's
+ * process-global provider registries are torn down. A weak process reference
+ * lets runners own that deterministic lifetime while still sharing one Env.
  */
-[[nodiscard]] Ort::Env& ort_environment() {
-    static Ort::Env environment{
-        ORT_LOGGING_LEVEL_WARNING,
-        "edge-perception-cpp"
-    };
+[[nodiscard]] std::shared_ptr<Ort::Env> acquire_ort_environment() {
+    static std::mutex environment_mutex{};
+    static std::weak_ptr<Ort::Env> weak_environment{};
+
+    const std::lock_guard<std::mutex> lock{environment_mutex};
+    std::shared_ptr<Ort::Env> environment = weak_environment.lock();
+
+    if (environment == nullptr) {
+        environment = std::make_shared<Ort::Env>(
+            ORT_LOGGING_LEVEL_WARNING,
+            "edge-perception-cpp"
+        );
+        weak_environment = environment;
+    }
 
     return environment;
 }
@@ -1188,18 +1179,17 @@ public:
     const InferenceEngineConfig& config
 )
     : config_(config),
+      environment_(acquire_ort_environment()),
       run_options_{} {
     try {
         // TensorRT EP uses ONNX Runtime's process-wide logger while its
         // execution provider is being configured. Ensure the Ort::Env exists
         // before appending any execution provider.
-        Ort::Env& environment = ort_environment();
-
         configure_session_options();
         configure_execution_providers();
 
         session_ = Ort::Session{
-            environment,
+            *environment_,
             config_.artifact_path.c_str(),
             session_options_
         };
@@ -1734,26 +1724,6 @@ private:
     }
 
     /**
-     * @brief Reject an output tensor that ORT did not fully overwrite.
-     */
-    void validate_completed_output() const {
-        for (
-            std::size_t index = 0U;
-            index < runtime_info_.model.output_element_count;
-            ++index
-        ) {
-            if (is_output_write_sentinel(host_output_data_[index])) {
-                throw std::runtime_error(
-                    "ONNX Runtime did not overwrite the complete output tensor; "
-                    "the write sentinel remained at flat index "
-                    + std::to_string(index)
-                    + "."
-                );
-            }
-        }
-    }
-
-    /**
      * @brief Allocate persistent pageable tensors around project-owned memory.
      */
     void allocate_pageable_cpu_tensors() {
@@ -2096,6 +2066,9 @@ private:
     InferenceEngineConfig config_{};
     InferenceRuntimeInfo runtime_info_{};
 
+    // Reverse destruction releases every session and provider reference
+    // before the shared environment.
+    std::shared_ptr<Ort::Env> environment_{};
     Ort::SessionOptions session_options_{};
     Ort::Session session_{nullptr};
     Ort::RunOptions run_options_{};

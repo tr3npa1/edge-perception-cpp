@@ -279,7 +279,9 @@ find_package(
         videoio
 )
 
-find_package(onnxruntime CONFIG QUIET)
+if(NOT ONNXRUNTIME_ROOT)
+    find_package(onnxruntime CONFIG QUIET)
+endif()
 
 if(TARGET onnxruntime::onnxruntime)
     set(EDGE_ONNXRUNTIME_TARGET onnxruntime::onnxruntime)
@@ -392,6 +394,7 @@ if(EDGE_ENABLE_TENSORRT)
         TENSORRT_NVINFER_LIBRARY
         NAMES nvinfer_11 nvinfer_10 nvinfer
         HINTS
+            "${TENSORRT_ROOT}/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"
@@ -403,6 +406,7 @@ if(EDGE_ENABLE_TENSORRT)
         TENSORRT_PLUGIN_LIBRARY
         NAMES nvinfer_plugin_11 nvinfer_plugin_10 nvinfer_plugin
         HINTS
+            "${TENSORRT_ROOT}/lib/${CMAKE_LIBRARY_ARCHITECTURE}"
             "${TENSORRT_ROOT}/lib"
             "${TENSORRT_ROOT}/lib64"
             "${TENSORRT_ROOT}/lib/x64"

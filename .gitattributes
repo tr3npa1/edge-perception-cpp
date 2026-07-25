@@ -1,0 +1,30 @@
+* text=auto
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Keep source, configuration, and documentation portable across Windows and
+# Linux builds by retaining LF in both the working tree and repository.
+*.cpp text eol=lf
+*.cu text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.py text eol=lf
+*.cmake text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+CMakeLists.txt text eol=lf
+Dockerfile text eol=lf
+
+# Treat generated model and media artifacts as binary if they are ever added
+# deliberately despite the repository ignore rules.
+*.engine binary
+*.onnx binary
+*.pt binary
+*.pth binary
+*.jpg binary
+*.jpeg binary
+*.png binary
