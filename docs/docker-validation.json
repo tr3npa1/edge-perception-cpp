@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "validated_utc": "2026-10-19T12:51:31.909213+00:00",
+  "scope": "four-image Linux container smoke, not a full accuracy or performance benchmark",
+  "image": {
+    "id": "sha256:5d47746e978b5956ec7e9a76cd06fffdfdced4922918119ae53511f13f80eb48",
+    "tag": "edge-perception-cpp:local",
+    "os": "linux",
+    "architecture": "amd64",
+    "user": "edge"
+  },
+  "base_image": "nvcr.io/nvidia/tensorrt:25.03-py3@sha256:97479e12b6962d351ea001b1b20ee75f3158e60a54b4830c3a26b35af31544ec",
+  "environment": {
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "driver_windows": "610.88",
+    "docker_server": "29.8.2",
+    "os": "Linux x86-64, Docker Desktop WSL 2",
+    "gcc": "13.3.0",
+    "cuda_toolkit": "12.8.93",
+    "tensorrt": "10.9.0.34",
+    "onnxruntime_cpp": "1.26.0",
+    "opencv": "4.6.0",
+    "uid": 10001,
+    "cuda_architectures": "75",
+    "fast_math": false
+  },
+  "build_ctest": {
+    "passed": 4,
+    "failed": 0
+  },
+  "inference_smoke": {
+    "ort-cpu": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        27,
+        18,
+        21
+      ]
+    },
+    "ort-cuda": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        27,
+        18,
+        21
+      ]
+    },
+    "ort-trt": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        27,
+        18,
+        21
+      ]
+    },
+    "native-fp16": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        27,
+        18,
+        22
+      ]
+    },
+    "fused-fp16": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        27,
+        18,
+        22
+      ]
+    },
+    "native-int8": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        25,
+        18,
+        21
+      ]
+    },
+    "fused-int8": {
+      "images": 4,
+      "detections_per_image": [
+        8,
+        25,
+        18,
+        21
+      ]
+    }
+  },
+  "gpu_regressions": {
+    "fp16": [
+      "CPU/CUDA preprocessing, interpolation, layout and half rounding",
+      "FP32/FP16 CUDA decoding and coordinate restoration",
+      "native synchronous output and deterministic graph/non-graph repeats",
+      "pipeline repeats, submit/collect: graph=0 gpu_postprocess=0",
+      "pipeline repeats, submit/collect: graph=1 gpu_postprocess=0",
+      "pipeline repeats, submit/collect: graph=0 gpu_postprocess=1",
+      "pipeline repeats, submit/collect: graph=1 gpu_postprocess=1",
+      "three concurrent native engines: exact reused-frame outputs, graph=0",
+      "three concurrent native engines: exact reused-frame outputs, graph=1",
+      "native benchmark depths 1/3, cancellation and callback cleanup, graph=0",
+      "native benchmark depths 1/3, cancellation and callback cleanup, graph=1"
+    ],
+    "int8": [
+      "CPU/CUDA preprocessing, interpolation, layout and half rounding",
+      "FP32/FP16 CUDA decoding and coordinate restoration",
+      "native synchronous output and deterministic graph/non-graph repeats",
+      "pipeline repeats, submit/collect: graph=0 gpu_postprocess=0",
+      "pipeline repeats, submit/collect: graph=1 gpu_postprocess=0",
+      "pipeline repeats, submit/collect: graph=0 gpu_postprocess=1",
+      "pipeline repeats, submit/collect: graph=1 gpu_postprocess=1",
+      "three concurrent native engines: exact reused-frame outputs, graph=0",
+      "three concurrent native engines: exact reused-frame outputs, graph=1",
+      "native benchmark depths 1/3, cancellation and callback cleanup, graph=0",
+      "native benchmark depths 1/3, cancellation and callback cleanup, graph=1"
+    ]
+  },
+  "native_fused_parity": {
+    "fp16": {
+      "passed_images": 4,
+      "total_images": 4,
+      "max_box_abs_diff": 0.0,
+      "max_conf_abs_diff": 0.0
+    },
+    "int8": {
+      "passed_images": 4,
+      "total_images": 4,
+      "max_box_abs_diff": 0.0,
+      "max_conf_abs_diff": 0.0
+    }
+  },
+  "parity_tolerances": {
+    "max_box_abs_diff_px": 0.002,
+    "max_conf_abs_diff": 1e-05,
+    "match_iou_threshold": 0.9,
+    "min_mean_iou": 0.9999,
+    "max_count_diff": 0
+  },
+  "expected_rejection": {
+    "backend": "ort-trt",
+    "artifact": "INT8 QDQ ONNX",
+    "exit_code": 1
+  },
+  "measured_inference_code_unchanged": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "3dd58505827e8bfa3bce483ecbb0eb71fc9dd800fff839701212f1f80c510a27"
+    },
+    {
+      "path": "CMakePresets.json",
+      "sha256": "9ad0f54b52685dcd272345fa4582e0cd843af798a9aa9df0b054ff33727d3fc8"
+    },
+    {
+      "path": "include/benchmark.hpp",
+      "sha256": "0f1deb4604cdf1e3148dc421dfe2e12a199ef82c47818eccc8ac4b91c35d8cb2"
+    },
+    {
+      "path": "include/engine_artifact.hpp",
+      "sha256": "9eac329e359f9e65a6c3a00da0d6981e8b9809c7331a2d435977df736419240a"
+    },
+    {
+      "path": "include/gpu_pipeline.hpp",
+      "sha256": "3460aafcce8fa6ebf2ddf60d9362d9543b6154cde0f374e7e30d6aeb4410b296"
+    },
+    {
+      "path": "include/image_processor.hpp",
+      "sha256": "97b896d515173b03a9179f8e9bccd814df27d01003b23eff2d677faed6bb1886"
+    },
+    {
+      "path": "include/inference_engine.hpp",
+      "sha256": "ca6dc5b9e5ba78aeed09d274dc4685f2837166f22cb7a67fca8fadd43a902a85"
+    },
+    {
+      "path": "include/postprocess.hpp",
+      "sha256": "3a0fb45782878086fd9c7213314f613907e3aa5837b41362d1574bb89b2da5d4"
+    },
+    {
+      "path": "src/benchmark.cpp",
+      "sha256": "b1c9ab16590a59eddc3aa0f7bc3967c6e911df78262450b0d452d37717f5d2fb"
+    },
+    {
+      "path": "src/gpu_pipeline.cu",
+      "sha256": "8f4c1c8465112418aa4896bccf3e9b68d87b82a0dda121df7b977ee02066c466"
+    },
+    {
+      "path": "src/gpu_pipeline_common.cpp",
+      "sha256": "9f942d8f865cfca1b0b1b7874610b7f68e4caccb342bc6714a28241faa9a462b"
+    },
+    {
+      "path": "src/gpu_pipeline_stub.cpp",
+      "sha256": "f52f6d9541bc3d88d9ec0e87f3ce11a37f54968c1d2a7b2c29362b00a582bac7"
+    },
+    {
+      "path": "src/image_processor.cpp",
+      "sha256": "b09b287765e1599a59b13307986d6bc3f76f1f081790e23283e4cceb4a3c1561"
+    },
+    {
+      "path": "src/inference_engine.cpp",
+      "sha256": "96ba3cb09474dd60e3163dd77ff79099ea52003612bc292a266310437235431e"
+    },
+    {
+      "path": "src/main.cpp",
+      "sha256": "2432411a703aa7ff584ad3307b54a76fa668c52e0b161c5d9e5d1a12b2331620"
+    },
+    {
+      "path": "src/postprocess.cpp",
+      "sha256": "a7e06f8ec0b4abd9985f0ae2bc253af500a7f0b276bdafcb5869a1e48594cb2d"
+    },
+    {
+      "path": "tools/benchmark_fp16_matrix.py",
+      "sha256": "b1594a7e4ce7fabc80b73830114dfbd773ec8ecaf24a77d278889c85c3b616cc"
+    },
+    {
+      "path": "tools/benchmark_release.py",
+      "sha256": "446fad4f0bfa27f467caf78a97e587027dc879a4727ef0fb38eb1fb335b4614f"
+    },
+    {
+      "path": "tools/run_fp16_matrix.ps1",
+      "sha256": "51928949a9802f5ae90bd0372fb362152192eef059864505a42b3c238aeebdba"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "Dockerfile",
+      "sha256": "84c0ec27864a0355b11ae495f9c3d4844055b37671a896985723590a8bcddc26"
+    },
+    {
+      "path": ".dockerignore",
+      "sha256": "de8c046c1adae8dde9d1ab5c68c3e0a51900563b445f9a0b11a18fce1967b161"
+    },
+    {
+      "path": "requirements-test.txt",
+      "sha256": "dff426b4b0e7a7cfa105d2138f587724872124915be0dcf824b79fcd4960b73b"
+    },
+    {
+      "path": "models/onnx/yolo26m_bdd100k_fp32.onnx",
+      "sha256": "9699532764f803cc6f159490961bdd491bb280a7bfe26a0b8894797679ec6a99"
+    },
+    {
+      "path": "models/onnx/yolo26m_bdd100k_int8.onnx",
+      "sha256": "fe9d637ae579ba3b6627ae2cbc4f5a8657374d057fa1746afc18ece8947766b5"
+    },
+    {
+      "path": "models/container/linux-sm75-trt10.9/yolo26m_bdd100k_fp16.engine",
+      "sha256": "50459e39a6e9118a62072591cd9779bb7c61c0ffe52f747ceb376147ce9fdc42"
+    },
+    {
+      "path": "models/container/linux-sm75-trt10.9/yolo26m_bdd100k_int8.engine",
+      "sha256": "7dd1dd80ec29db4ee4e48e1987ea1f7836c19c7ed34cac2c54336d0c8c400081"
+    },
+    {
+      "path": "outputs/docker-validation/inputs/000000.jpg",
+      "sha256": "77a5f0dffedb6d3837dde0d006dd6b149550e5588a2bca5d05054eec5fd4d346"
+    },
+    {
+      "path": "outputs/docker-validation/inputs/000001.jpg",
+      "sha256": "662712d0055f0d6d46af4a68fa9d57ae217a9bd4f698c5b4cb03297d407cd370"
+    },
+    {
+      "path": "outputs/docker-validation/inputs/000002.jpg",
+      "sha256": "676c9625b4b7cb2e28634bc2041745a87f063f06970c0e6b3c25872e96519a22"
+    },
+    {
+      "path": "outputs/docker-validation/inputs/000003.jpg",
+      "sha256": "45b84a0586528cce1073b68af1d539ccdc9134a9d87d837f3117a66e5d4530c3"
+    }
+  ],
+  "raw_evidence": "outputs/docker-validation",
+  "evidence_hashes": {
+    "build-fp16-engine.log": "0600560117504a0ee562c706eb07fa59155f6c0a2ea3015c3896b61a77264777",
+    "build-int8-engine.log": "9b6d81cc74a2ec5752a6eeedc27018dc20303250b72f440adb0c6604210bf5bf",
+    "build-test-image.log": "17a35bbcaaade0d2e3ec9ee7516163d9920efc327825b3f56d33eaebfc4efc13",
+    "build.log": "a224cb3b94428b1a91de3eb903072ae3341e0a0bcd206c6ce01e66e31c9ee5ac",
+    "fused-fp16.log": "e4c9145c6392d7020518f7960cb096af9208821ee95b676688eb06ff5d46c906",
+    "fused-int8.log": "4aace7cd412cb586e0d2923bf1fd8cf189d77f032bdfd791af3087689c302265",
+    "gpu-fp16.log": "cfa7acfeda957d5f5d6277ec8f4734f0e0de0f6bc97bed68f8496dcc16739331",
+    "gpu-int8.log": "cfa7acfeda957d5f5d6277ec8f4734f0e0de0f6bc97bed68f8496dcc16739331",
+    "help.log": "b8639bb003c3a49101092e8b92d45d69cd8c1522b94fd0f32103abd8a85cd37f",
+    "native-fp16.log": "a5b806b630642aec2f1cee62bea3c40e45e1964a0037d5a20c70ec0d98b300ba",
+    "native-int8.log": "a7b6613dbcdc92096803dbf4e37d6b2f706c6aff4fac0782cbc9e3dd02694492",
+    "ort-cpu.log": "b29cac4365021c3163ee7750efb74d38ddbbc96dcb5a8ab3f3c9306801afb655",
+    "ort-cuda.log": "0dfa82b92ae3d385c183794bad1c31399afa2f3c937c4ab7f0c8794d9f975cbb",
+    "ort-trt-int8-policy.log": "3bcca5b9f417819642fbf049623ef09df46233e0b16debaf3d1cec2eb17ba822",
+    "ort-trt.log": "55d7bdc6c5aa5900f83f6fd15206c71af17ed96f5854dddc082564cae1106cf4"
+  },
+  "detection_output_hashes": {
+    "outputs/docker-validation/fused-fp16/detections.jsonl": "55225d609b0cf27f33429982f18940b67c32c113c2821d0fa4f8cb23eb10c6e4",
+    "outputs/docker-validation/fused-int8/detections.jsonl": "ebf3b4c4d309f733fbe121ca2a6613f68fe54e982a91106cb4e1aba7289d09f2",
+    "outputs/docker-validation/native-fp16/detections.jsonl": "fb20a108d53c0d471bcce5654887652c214553de9ad5451c68c0495dda4df611",
+    "outputs/docker-validation/native-int8/detections.jsonl": "d501d43d880c2a209876caa5cd99c203ddfbc91dbbd0c1423eb4827f3cd0f756",
+    "outputs/docker-validation/ort-cpu/detections.jsonl": "2932a1268b9b49640db913810ea81f928e9d86ae191d50085dc47e95ae75cf07",
+    "outputs/docker-validation/ort-cuda/detections.jsonl": "72ffb6e6827394963bfa2ccb61201ca5dbbccdeafc5ce27e20e1dfc36819573e",
+    "outputs/docker-validation/ort-trt/detections.jsonl": "6ae994899464c315b1f5ee034e995c39d35da1c941bc442287bf3e8a42272aa2"
+  },
+  "not_measured": [
+    "Full-dataset Linux mAP",
+    "Linux latency/throughput",
+    "Windows/Linux strict parity",
+    "Native/fused FP32 Linux engine inference",
+    "Camera/video input"
+  ],
+  "published_or_pushed": false
+}

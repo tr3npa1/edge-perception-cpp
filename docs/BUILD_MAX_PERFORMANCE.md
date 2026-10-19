@@ -1,20 +1,25 @@
-# Maximum-performance Windows build
+# Windows performance build profiles
 
 The fused pipeline is compiled only when both native TensorRT and the CUDA
-pipeline are enabled. For the current RTX 2060, compile CUDA code for SM 7.5.
+pipeline are enabled. For an RTX 2060, compile CUDA code for SM 7.5.
 
-Run from a shell where the MSVC compiler environment is active.
+The published measurements use `nvidia-release`, with IPO and fast math off.
+The profiles below are optional tuning experiments, not the configuration used
+for those measurements. Their effects require fresh correctness and timing checks.
+
+Run from the repository root in a shell where the MSVC compiler environment
+is active. Set the dependency environment variables for your installation;
+see the [native build instructions](USAGE.md#native-builds).
 
 ```powershell
-cd E:\tmkc\edge-perception-cpp
-
 $Build = "build-max"
+$env:EDGE_MSVC_COMPILER = (Get-Command cl.exe).Source
 
 cmake -S . -B $Build -G Ninja `
     -DCMAKE_BUILD_TYPE=Release `
     -DCMAKE_CXX_COMPILER="$env:EDGE_MSVC_COMPILER" `
-    -DCMAKE_CUDA_COMPILER="$env:EDGE_CUDA12_ROOT\bin\nvcc.exe" `
-    -DCUDAToolkit_ROOT="$env:EDGE_CUDA12_ROOT" `
+    -DCMAKE_CUDA_COMPILER="$env:EDGE_CUDA_ROOT\bin\nvcc.exe" `
+    -DCUDAToolkit_ROOT="$env:EDGE_CUDA_ROOT" `
     -DOpenCV_DIR="C:\opencv\build\x64\vc16\lib" `
     -DONNXRUNTIME_ROOT="$env:EDGE_ONNXRUNTIME_ROOT" `
     -DONNXRUNTIME_RUNTIME_DIR="$env:EDGE_ONNXRUNTIME_ROOT\lib" `
@@ -42,8 +47,8 @@ After the primary parity build succeeds, create a separate build directory:
 cmake -S . -B build-max-fast-math -G Ninja `
     -DCMAKE_BUILD_TYPE=Release `
     -DCMAKE_CXX_COMPILER="$env:EDGE_MSVC_COMPILER" `
-    -DCMAKE_CUDA_COMPILER="$env:EDGE_CUDA12_ROOT\bin\nvcc.exe" `
-    -DCUDAToolkit_ROOT="$env:EDGE_CUDA12_ROOT" `
+    -DCMAKE_CUDA_COMPILER="$env:EDGE_CUDA_ROOT\bin\nvcc.exe" `
+    -DCUDAToolkit_ROOT="$env:EDGE_CUDA_ROOT" `
     -DOpenCV_DIR="C:\opencv\build\x64\vc16\lib" `
     -DONNXRUNTIME_ROOT="$env:EDGE_ONNXRUNTIME_ROOT" `
     -DONNXRUNTIME_RUNTIME_DIR="$env:EDGE_ONNXRUNTIME_ROOT\lib" `
@@ -69,7 +74,13 @@ and allocations. The specialized native TensorRT pipeline owns only CUDA 12.8
 objects. Do not pass device pointers or streams from one runtime path into the
 other.
 
-## Recommended maximum-performance runtime settings
+## Runtime configuration example
+
+Depth 2 is an example, not a universally optimal setting. The complete
+[FP16 matrix](results/fp16-matrix.md) measures native/fused depth-3 throughput
+at 254.615/245.906 FPS. Sequential and streaming frame latency are separate
+metrics. Fused FP16 passes 64/64 against the same Python engine; strict PyTorch
+parity is 61/64. See the [correctness evidence](results/fp16-correctness.md).
 
 ```cpp
 edge::NativeTensorRtPipelineConfig config{};

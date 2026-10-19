@@ -1,0 +1,18 @@
+NVIDIA linking permission for the original C++ runtime
+
+Copyright (c) 2026 tr3npa1 and edge-perception-cpp contributors
+
+As an additional permission under section 7 of the GNU Affero General Public
+License, version 3, the copyright holders of the original edge-perception-cpp
+C++ runtime in include/ and src/ permit you to link or combine that code with
+NVIDIA CUDA, cuDNN and TensorRT libraries, and to convey the resulting work.
+You must comply with the GNU Affero General Public License for the covered
+project code, but you are not required by this permission to provide the source
+code of those NVIDIA libraries. Those libraries remain subject to their own
+licenses, and this permission grants no rights to NVIDIA software or trademarks.
+
+This permission applies only to code whose copyright holders have granted it.
+It does not extend to third-party code, including Ultralytics, or to models,
+datasets or example imagery. It does not impose the project's license on the
+NVIDIA base image or its separately licensed components. All other obligations
+of the GNU Affero General Public License remain in effect.

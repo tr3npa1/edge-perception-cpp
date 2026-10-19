@@ -1,0 +1,82 @@
+{
+  "status": "completed",
+  "evidence_validated": true,
+  "verified_evidence_files": 7089,
+  "coordinator_jobs": 120,
+  "quality_paths": 24,
+  "parity_comparisons": 42,
+  "parity_passed": 22,
+  "performance_executions": 202,
+  "performance_passed": 200,
+  "preparation": [
+    {
+      "path": "prep_20261018_151028_018",
+      "state": "prepared",
+      "steps": [
+        {
+          "name": "configure",
+          "exit_code": 0
+        },
+        {
+          "name": "build",
+          "exit_code": 0
+        },
+        {
+          "name": "ctest",
+          "exit_code": 0
+        },
+        {
+          "name": "runner-tests",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "prep_20261018_210009_665",
+      "state": "prepared",
+      "steps": [
+        {
+          "name": "configure",
+          "exit_code": 0
+        },
+        {
+          "name": "build",
+          "exit_code": 0
+        },
+        {
+          "name": "ctest",
+          "exit_code": 0
+        },
+        {
+          "name": "runner-tests",
+          "exit_code": 0
+        }
+      ]
+    },
+    {
+      "path": "prep_20261019_125109_252",
+      "state": "prepared",
+      "steps": [
+        {
+          "name": "configure",
+          "exit_code": 0
+        },
+        {
+          "name": "build",
+          "exit_code": 0
+        },
+        {
+          "name": "ctest",
+          "exit_code": 0
+        },
+        {
+          "name": "runner-tests",
+          "exit_code": 0
+        }
+      ]
+    }
+  ],
+  "gpu_int8_regressions_passed": true,
+  "docker": "Not validated by this native Windows benchmark",
+  "remote_ci": "Not established by local benchmark evidence"
+}

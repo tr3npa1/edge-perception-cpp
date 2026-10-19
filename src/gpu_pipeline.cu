@@ -1,4 +1,9 @@
 #include "gpu_pipeline.hpp"
+#include "engine_artifact.hpp"
+
+#if defined(EDGE_ENABLE_GPU_PIPELINE_TESTING)
+#include "../tests/gpu_pipeline_test_support.hpp"
+#endif
 
 #include <NvInfer.h>
 #include <NvInferPlugin.h>
@@ -730,6 +735,9 @@ struct PreprocessKernelParams {
     int pad_left = 0;
     int pad_top = 0;
 
+    double resize_scale_x = 1.0;
+    double resize_scale_y = 1.0;
+
     std::size_t pitch0 = 0U;
     std::size_t pitch1 = 0U;
 
@@ -742,9 +750,9 @@ struct PreprocessKernelParams {
     float mean0 = 0.0F;
     float mean1 = 0.0F;
     float mean2 = 0.0F;
-    float inv_std0 = 1.0F;
-    float inv_std1 = 1.0F;
-    float inv_std2 = 1.0F;
+    float std0 = 1.0F;
+    float std1 = 1.0F;
+    float std2 = 1.0F;
 
     float pad_r = 114.0F;
     float pad_g = 114.0F;
@@ -838,6 +846,38 @@ __device__ __forceinline__ float3 read_interleaved_rgb(
     );
 }
 
+__device__ __forceinline__ float resize_linear_u8_channel(
+    float top_left,
+    float top_right,
+    float bottom_left,
+    float bottom_right,
+    int alpha0,
+    int alpha1,
+    int beta0,
+    int beta1,
+    bool half_size
+) {
+    const int tl = static_cast<int>(top_left);
+    const int tr = static_cast<int>(top_right);
+    const int bl = static_cast<int>(bottom_left);
+    const int br = static_cast<int>(bottom_right);
+
+    // OpenCV dispatches exact 2x downsampling to its area-average path.
+    if (half_size) {
+        return static_cast<float>((tl + tr + bl + br + 2) >> 2);
+    }
+
+    // INTER_LINEAR on CV_8UC3 uses 11-bit coefficients and staged integer
+    // truncation in its vertical pass. Rounding a floating bilinear result
+    // once is not equivalent, and retaining fractional pixels changes the
+    // model input even more substantially.
+    const int top = tl * alpha0 + tr * alpha1;
+    const int bottom = bl * alpha0 + br * alpha1;
+    const int upper = (beta0 * (top >> 4)) >> 16;
+    const int lower = (beta1 * (bottom >> 4)) >> 16;
+    return static_cast<float>((upper + lower + 2) >> 2);
+}
+
 __device__ __forceinline__ float3 sample_interleaved_bilinear(
     const std::uint8_t* source,
     const PreprocessKernelParams& params,
@@ -848,7 +888,10 @@ __device__ __forceinline__ float3 sample_interleaved_bilinear(
     const int x0_unclamped = static_cast<int>(floorf(source_x));
     const int y0_unclamped = static_cast<int>(floorf(source_y));
 
-    const float weight_x = source_x - floorf(source_x);
+    const float weight_x = x0_unclamped < 0
+        || x0_unclamped >= params.source_width - 1
+        ? 0.0F
+        : source_x - floorf(source_x);
     const float weight_y = source_y - floorf(source_y);
 
     const int x0 = clamp_integer(
@@ -907,26 +950,27 @@ __device__ __forceinline__ float3 sample_interleaved_bilinear(
         source_is_rgb
     );
 
-    const float inverse_x = 1.0F - weight_x;
-    const float inverse_y = 1.0F - weight_y;
-
-    const float top_r = top_left.x * inverse_x + top_right.x * weight_x;
-    const float top_g = top_left.y * inverse_x + top_right.y * weight_x;
-    const float top_b = top_left.z * inverse_x + top_right.z * weight_x;
-
-    const float bottom_r =
-        bottom_left.x * inverse_x + bottom_right.x * weight_x;
-
-    const float bottom_g =
-        bottom_left.y * inverse_x + bottom_right.y * weight_x;
-
-    const float bottom_b =
-        bottom_left.z * inverse_x + bottom_right.z * weight_x;
+    constexpr float coefficient_scale = 2048.0F;
+    const int alpha0 = __float2int_rn((1.0F - weight_x) * coefficient_scale);
+    const int alpha1 = __float2int_rn(weight_x * coefficient_scale);
+    const int beta0 = __float2int_rn((1.0F - weight_y) * coefficient_scale);
+    const int beta1 = __float2int_rn(weight_y * coefficient_scale);
+    const bool half_size = params.source_width == 2 * params.resized_width
+        && params.source_height == 2 * params.resized_height;
 
     return make_float3(
-        top_r * inverse_y + bottom_r * weight_y,
-        top_g * inverse_y + bottom_g * weight_y,
-        top_b * inverse_y + bottom_b * weight_y
+        resize_linear_u8_channel(
+            top_left.x, top_right.x, bottom_left.x, bottom_right.x,
+            alpha0, alpha1, beta0, beta1, half_size
+        ),
+        resize_linear_u8_channel(
+            top_left.y, top_right.y, bottom_left.y, bottom_right.y,
+            alpha0, alpha1, beta0, beta1, half_size
+        ),
+        resize_linear_u8_channel(
+            top_left.z, top_right.z, bottom_left.z, bottom_right.z,
+            alpha0, alpha1, beta0, beta1, half_size
+        )
     );
 }
 
@@ -1151,9 +1195,11 @@ __device__ __forceinline__ float normalized_channel(
     float pixel,
     float scale,
     float mean,
-    float inverse_std
+    float stddev
 ) {
-    return (pixel * scale - mean) * inverse_std;
+    // Keep the CPU lookup-table operation order, including division instead
+    // of reciprocal multiplication, and do not contract multiply/subtract.
+    return __fdiv_rn(__fsub_rn(__fmul_rn(pixel, scale), mean), stddev);
 }
 
 struct NormalizedPixel {
@@ -1184,17 +1230,32 @@ __device__ __forceinline__ NormalizedPixel preprocess_one_pixel(
         && resized_y >= 0
         && resized_y < params.resized_height
     ) {
-        const float source_x =
+        float source_x =
             (static_cast<float>(resized_x) + 0.5F)
             * static_cast<float>(params.source_width)
             / static_cast<float>(params.resized_width)
             - 0.5F;
 
-        const float source_y =
+        float source_y =
             (static_cast<float>(resized_y) + 0.5F)
             * static_cast<float>(params.source_height)
             / static_cast<float>(params.resized_height)
             - 0.5F;
+
+        if (params.source_mode != static_cast<int>(SourceMode::DeviceNv12)) {
+            // cv::resize computes half-pixel positions in double, then casts
+            // to float before deriving its fixed-point coefficients.
+            source_x = static_cast<float>(__dsub_rn(
+                __dmul_rn(static_cast<double>(resized_x) + 0.5,
+                          params.resize_scale_x),
+                0.5
+            ));
+            source_y = static_cast<float>(__dsub_rn(
+                __dmul_rn(static_cast<double>(resized_y) + 0.5,
+                          params.resize_scale_y),
+                0.5
+            ));
+        }
 
         rgb = sample_source_rgb(
             plane0,
@@ -1214,19 +1275,19 @@ __device__ __forceinline__ NormalizedPixel preprocess_one_pixel(
             first,
             params.pixel_scale,
             params.mean0,
-            params.inv_std0
+            params.std0
         ),
         normalized_channel(
             second,
             params.pixel_scale,
             params.mean1,
-            params.inv_std1
+            params.std1
         ),
         normalized_channel(
             third,
             params.pixel_scale,
             params.mean2,
-            params.inv_std2
+            params.std2
         )
     };
 }
@@ -1564,6 +1625,8 @@ __global__ void fused_postprocess_kernel(
         transform.network_size.height,
         transform.pad_left,
         transform.pad_top,
+        1.0 / (static_cast<double>(transform.resized_size.width) / source.width),
+        1.0 / (static_cast<double>(transform.resized_size.height) / source.height),
         source.pitch0,
         source.pitch1,
         static_cast<int>(source.mode),
@@ -1574,9 +1637,9 @@ __global__ void fused_postprocess_kernel(
         config.mean[0],
         config.mean[1],
         config.mean[2],
-        1.0F / config.stddev[0],
-        1.0F / config.stddev[1],
-        1.0F / config.stddev[2],
+        config.stddev[0],
+        config.stddev[1],
+        config.stddev[2],
         static_cast<float>(config.padding_bgr[2]),
         static_cast<float>(config.padding_bgr[1]),
         static_cast<float>(config.padding_bgr[0])
@@ -1816,6 +1879,129 @@ struct PipelineSlot final {
 
 }  // namespace
 
+#if defined(EDGE_ENABLE_GPU_PIPELINE_TESTING)
+namespace testing {
+
+LetterboxTransform preprocess_bgr(
+    const cv::Mat& image,
+    const PreprocessConfig& config,
+    MutableTensorView destination
+) {
+    config.validate();
+    if (image.empty() || image.dims != 2 || image.type() != CV_8UC3
+        || config.interpolation != ResizeInterpolation::Linear) {
+        throw std::invalid_argument("Invalid CUDA preprocess test input.");
+    }
+    const ImageProcessor processor{config};
+    const std::size_t output_bytes = processor.required_byte_count(
+        destination.element_type
+    );
+    if (destination.data == nullptr || output_bytes == 0U
+        || destination.byte_capacity < output_bytes) {
+        throw std::invalid_argument("Invalid CUDA preprocess test output.");
+    }
+
+    const LetterboxTransform transform =
+        ImageProcessor::calculate_letterbox_transform(
+            ImageSize{image.cols, image.rows}, config
+        );
+    CudaStream stream{0, false};
+    DeviceBuffer source_buffer{checked_image_bytes({image.cols, image.rows})};
+    DeviceBuffer output_buffer{output_bytes};
+    const std::size_t row_bytes = static_cast<std::size_t>(image.cols) * 3U;
+    check_cuda(cudaMemcpy2DAsync(
+        source_buffer.data(), row_bytes, image.data, image.step[0],
+        row_bytes, static_cast<std::size_t>(image.rows),
+        cudaMemcpyHostToDevice, stream.get()
+    ), "CUDA preprocess test input copy");
+
+    SourceDescriptor source{};
+    source.mode = SourceMode::DeviceBgr;
+    source.plane0 = source_buffer.data();
+    source.width = image.cols;
+    source.height = image.rows;
+    source.pitch0 = row_bytes;
+    launch_preprocess(source, transform, config, destination.element_type,
+                      output_buffer.data(), stream.get());
+    check_cuda(cudaMemcpyAsync(
+        destination.data, output_buffer.data(), output_bytes,
+        cudaMemcpyDeviceToHost, stream.get()
+    ), "CUDA preprocess test output copy");
+    check_cuda(cudaStreamSynchronize(stream.get()),
+               "CUDA preprocess test synchronize");
+    return transform;
+}
+
+PostprocessSummary postprocess(
+    const std::vector<float>& raw,
+    TensorElementType output_type,
+    const LetterboxTransform& transform,
+    const PostprocessConfig& config,
+    DetectionBuffer& detections
+) {
+    config.validate();
+    const std::size_t scalar_bytes = tensor_element_size(output_type);
+    if (raw.size() != kModelOutputElementCount || scalar_bytes == 0U
+        || !transform.valid()
+        || config.malformed_candidate_policy != MalformedCandidatePolicy::Discard) {
+        throw std::invalid_argument("Invalid CUDA postprocess test input.");
+    }
+
+    CudaStream stream{0, false};
+    DeviceBuffer input_buffer{raw.size() * scalar_bytes};
+    DeviceBuffer output_buffer{sizeof(DevicePostprocessResult)};
+    std::vector<__half> half_output{};
+    const void* input = raw.data();
+    if (output_type == TensorElementType::Float16) {
+        half_output.reserve(raw.size());
+        for (float value : raw) {
+            half_output.push_back(__float2half_rn(value));
+        }
+        input = half_output.data();
+    }
+    check_cuda(cudaMemcpyAsync(
+        input_buffer.data(), input, raw.size() * scalar_bytes,
+        cudaMemcpyHostToDevice, stream.get()
+    ), "CUDA postprocess test input copy");
+    launch_postprocess(input_buffer.data(), output_type, transform, config,
+                       static_cast<DevicePostprocessResult*>(output_buffer.data()),
+                       stream.get());
+    DevicePostprocessResult host{};
+    check_cuda(cudaMemcpyAsync(
+        &host, output_buffer.data(), sizeof(host),
+        cudaMemcpyDeviceToHost, stream.get()
+    ), "CUDA postprocess test output copy");
+    check_cuda(cudaStreamSynchronize(stream.get()),
+               "CUDA postprocess test synchronize");
+    if (host.summary.detections_written > kModelMaximumDetections) {
+        throw std::runtime_error("Invalid CUDA postprocess test detection count.");
+    }
+    Detection* const decoded = detections.resize_for_overwrite(
+        host.summary.detections_written
+    );
+    if (decoded == nullptr) {
+        throw std::runtime_error("Invalid CUDA postprocess test detection storage.");
+    }
+    for (std::size_t index = 0U; index < host.summary.detections_written; ++index) {
+        const DeviceDetectionPacked& source = host.detections[index];
+        decoded[index] = Detection{
+            BoundingBox{source.x_min, source.y_min, source.x_max, source.y_max},
+            source.confidence, source.class_id
+        };
+    }
+    return PostprocessSummary{
+        host.summary.candidates_examined,
+        host.summary.rejected_by_confidence,
+        host.summary.rejected_as_malformed,
+        host.summary.rejected_as_degenerate,
+        host.summary.detections_written,
+        host.summary.maximum_reached != 0U
+    };
+}
+
+}  // namespace testing
+#endif
+
 class NativeTensorRtPipeline::Impl final {
 public:
     explicit Impl(
@@ -1840,9 +2026,10 @@ public:
         const std::vector<std::uint8_t> bytes = read_binary_file(
             config_.engine_path
         );
+        const TensorRtPayload payload = tensorrt_payload(bytes);
 
         engine_.reset(
-            runtime_->deserializeCudaEngine(bytes.data(), bytes.size())
+            runtime_->deserializeCudaEngine(payload.data, payload.size)
         );
 
         if (engine_ == nullptr) {

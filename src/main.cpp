@@ -95,6 +95,7 @@ struct ApplicationOptions {
     std::size_t maximum_detections = kModelMaximumDetections;
 
     bool save_output = true;
+    bool json_only = false;
     bool print_detections = false;
     bool debug_parity = false;
     bool enable_cuda_graph = true;
@@ -632,6 +633,7 @@ void print_usage(std::ostream& output) {
         << "  --no-ort-cuda-fallback               Disable CUDA fallback behind ORT TensorRT\n\n"
         << "Inference options:\n"
         << "  --no-save                            Do not write annotated media or JSONL\n"
+        << "  --json-only                          Directory inference: JSONL without annotated images\n"
         << "  --print-detections                   Print every detection row\n"
         << "  --max-frames <N>                     Stream frame limit; 0 = until end/Ctrl+C\n"
         << "  --max-host-width <N>                 Fused pinned host capacity width\n"
@@ -754,6 +756,10 @@ void print_usage(std::ostream& output) {
 
         if (argument == "--no-save") {
             options.save_output = false;
+            continue;
+        }
+        if (argument == "--json-only") {
+            options.json_only = true;
             continue;
         }
 
@@ -2168,19 +2174,11 @@ int run_directory_inference(
         );
 
         if (options.save_output) {
-            const fs::path relative = fs::relative(
-                image_path,
-                source.path
-            );
-
-            const fs::path parent =
-                options.output_directory / relative.parent_path();
-
-            save_annotated_image(
-                image_output_path(parent, image_path),
-                frame,
-                result.detections
-            );
+            if (!options.json_only) {
+                const fs::path relative = fs::relative(image_path, source.path);
+                const fs::path parent = options.output_directory / relative.parent_path();
+                save_annotated_image(image_output_path(parent, image_path), frame, result.detections);
+            }
 
             jsonl->write(
                 processed,
@@ -2749,6 +2747,12 @@ int main(
 
         const edge::SourceDescriptor source =
             edge::describe_source(options.source_argument);
+
+        if (options.json_only && (!options.save_output
+            || options.mode != edge::ApplicationMode::Inference
+            || source.kind != edge::SourceKind::ImageDirectory)) {
+            throw std::invalid_argument("--json-only requires directory inference with saving enabled.");
+        }
 
         if (options.mode == edge::ApplicationMode::Benchmark) {
             return edge::run_benchmark_mode(options, source);

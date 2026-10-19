@@ -1,16 +1,22 @@
 # edge-perception-cpp optimization architecture
 
-This document records the performance-oriented design of the completed native
-runtime and the boundaries of its optimized execution paths.
+This document describes the native runtime's execution paths, memory ownership,
+and performance-oriented design.
 
-It contains the original generic CPU/ONNX Runtime/native-TensorRT path and a
-second, specialized native TensorRT fast path designed for the lowest practical
-camera/image-to-detection latency available within the project's current
-OpenCV, CUDA, TensorRT, and ONNX Runtime dependency set.
+The generic path supports ONNX Runtime and synchronous native TensorRT. The
+specialized TensorRT pipeline combines CUDA preprocessing and postprocessing
+with persistent buffers and asynchronous execution.
 
-The honest target is to outperform the complete Python/Ultralytics TensorRT
-wrapper path end to end. It does not claim to make TensorRT's selected model
-kernels faster than TensorRT itself.
+These optimizations reduce work surrounding TensorRT execution, including
+intermediate allocations, image copies, and host-side processing. Their effect
+depends on the model, hardware, input path, and pipeline configuration and must
+be measured with a consistent benchmark.
+
+The [measurement report](results/README.md) separates performance from
+[quality and parity limitations](RESULTS_ANALYSIS.md). Native/fused FP32, FP16
+and INT8 have full-test quality and same-depth timing evidence. Fusion does not
+win every comparison. The architecture below describes implemented mechanisms,
+not proof that every input path is validated or every optimization is beneficial.
 
 ## Packaged source files
 
@@ -26,11 +32,11 @@ kernels faster than TensorRT itself.
 - `src/gpu_pipeline.cu`
 - `src/gpu_pipeline_stub.cpp`
 
-## Maximum-latency path
+## Fused TensorRT path
 
-The new `NativeTensorRtPipeline` is independent from the generic
-`InferenceEngine` so the safe multi-backend interface remains available while
-the TensorRT path can specialize aggressively.
+`NativeTensorRtPipeline` is independent from the generic `InferenceEngine`.
+This separates TensorRT-specific scheduling and memory management from the
+portable multi-backend interface.
 
 ### Ordinary OpenCV BGR input
 
@@ -71,13 +77,15 @@ surfaces. It removes the host image transfer entirely.
 
 One kernel performs:
 
-- half-pixel bilinear resize;
+- half-pixel resize; packed RGB/BGR input reproduces OpenCV fixed-point
+  interpolation and 8-bit rounding, including the exact 2× downsampling case;
 - exact project letterbox geometry and padding;
 - BGR, RGB, or NV12 input sampling;
 - BT.601 or BT.709 NV12 conversion;
 - full-range or limited-range NV12 handling;
 - RGB/BGR output ordering;
-- pixel scaling, mean subtraction, and standard-deviation normalization;
+- pixel scaling, mean subtraction, and standard-deviation normalization in
+  the CPU reference's operation order;
 - direct planar NCHW writes into the TensorRT device input;
 - direct FP32 or FP16 output;
 - pairwise vectorized `float2` or `half2` stores.
@@ -102,6 +110,21 @@ The model already emits final NMS-free `[1,300,6]` rows. One CUDA block:
 The CPU postprocessor remains selectable for parity and debugging.
 
 ## Pipeline overlap
+
+### Native streaming workers
+
+The generic native TensorRT streaming benchmark creates persistent per-slot
+workers with independent engine/context, pinned/device storage, preprocessing
+workspace and nonblocking streams. Slot zero borrows the supplied engine and
+processor; no instance is called concurrently. Engines duplicate weight state,
+so deeper pipelines increase memory use. Reported per-slot memory is not total
+process memory. Cancellation drains and joins workers before releasing resources.
+
+Depth-3 measurements observed three active workers for every precision and
+repetition. This verifies asynchronous host execution, not guaranteed overlap
+of TensorRT kernels on the GPU.
+
+### Fused execution slots
 
 The specialized pipeline owns a configurable ring of 1–8 slots, defaulting to
 two. Every slot owns:
@@ -153,7 +176,7 @@ addresses. Capture failure falls back to the ordinary asynchronous path unless
 - CUDA streams use the highest available non-real-time priority by default.
 - Native FP32 and FP16 external bindings are supported.
 
-## Existing generic-path optimizations retained
+## Generic-path optimizations
 
 ### CPU preprocessing
 
@@ -201,9 +224,9 @@ addresses. Capture failure falls back to the ordinary asynchronous path unless
 
 ## Deliberate boundaries
 
-No implementation can honestly contain every optimization possible on every
-future machine. The package includes all practical latency optimizations that
-fit the current fixed model contract and current dependency stack.
+The inference core operates on decoded image data and a fixed model contract.
+Acquisition, engine tuning, and system-level scheduling remain separate
+integration concerns.
 
 Not bundled:
 
@@ -211,13 +234,10 @@ Not bundled:
 - rebuilding the TensorRT engine with new tactics, plugins, or architecture-
   specific global build-route searches;
 - operating-system process priority, CPU affinity, GPU clock locking, or power
-  controls;
-- benchmark claims.
+  controls.
 
-Those are environment/application or engine-build concerns rather than missing
-copies in the current inference core. The device BGR/RGB/NV12 API is already
-present so an eventual decoder can feed the optimized path without redesigning
-the inference layer.
+The device BGR/RGB/NV12 API allows an external decoder or capture layer to feed
+GPU-resident frames directly into the inference pipeline.
 
 ## Validation expectations
 

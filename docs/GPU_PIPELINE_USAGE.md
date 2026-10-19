@@ -1,8 +1,19 @@
 # NativeTensorRtPipeline usage
 
-`NativeTensorRtPipeline` is the maximum-performance native TensorRT path. The
+`NativeTensorRtPipeline` is the specialized CUDA/TensorRT path. The
 generic `InferenceEngine` remains useful for ONNX Runtime comparisons and
 simple synchronous execution.
+
+See the [measured results](results/README.md) and
+[parity limitations](RESULTS_ANALYSIS.md) before selecting a deployment path.
+The fused FP16 path passes same-artifact parity on 64/64 fixed images;
+strict PyTorch parity is 61/64. See the
+[correctness report](results/fp16-correctness.md) and complete
+[same-depth matrix](results/fp16-matrix.md). Native/fused full-test mAP50–95
+is 34.0120 for FP16 and 33.2609 for INT8. Both loaders accept raw and
+Ultralytics-prefixed plans; see [INT8 validation](results/int8-status.md).
+The benchmark uses OpenCV BGR input; the external-input APIs below were not
+separately benchmarked in that suite.
 
 ## Synchronous OpenCV frame
 

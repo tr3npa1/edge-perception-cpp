@@ -37,6 +37,7 @@ import json
 import logging
 import math
 import platform
+import random
 import shutil
 import subprocess
 import sys
@@ -1488,7 +1489,7 @@ def collect_calibration_images(
     roots = resolve_split_paths_from_yaml(data_yaml, split="train")
 
     if not roots:
-        roots = resolve_split_paths_from_yaml(data_yaml, split="val")
+        raise ValueError("Calibration requires the train split; validation/test fallback is forbidden.")
 
     images: list[Path] = []
     for root in roots:
@@ -1510,12 +1511,10 @@ def collect_calibration_images(
         )
 
     keep_count = max(1, int(len(images) * fraction))
-    images = images[:keep_count]
-
     if max_images > 0:
-        images = images[:max_images]
-
-    return images
+        keep_count = min(keep_count, max_images)
+    # Avoid a correlated lexicographic prefix (e.g. adjacent frames/videos).
+    return random.Random(42).sample(images, keep_count)
 
 
 class YoloCalibrationDataReader:
@@ -1537,14 +1536,16 @@ class YoloCalibrationDataReader:
         self.index += 1
 
         import numpy as np
-        from PIL import Image
+        import cv2
+        from ultralytics.data.augment import LetterBox
 
-        image = Image.open(image_path).convert("RGB")
-        image = image.resize((self.imgsz, self.imgsz))
-        array = np.asarray(image, dtype=np.float32) / 255.0
-        array = np.transpose(array, (2, 0, 1))[None, ...]
-
-        return {self.input_name: array.astype(np.float32)}
+        image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
+        if image is None or image.size == 0:
+            raise ValueError(f"Cannot decode calibration image: {image_path}")
+        image = LetterBox(new_shape=(self.imgsz, self.imgsz), auto=False)(image=image)
+        array = np.ascontiguousarray(image[:, :, ::-1].transpose(2, 0, 1)[None], dtype=np.float32)
+        array /= 255.0
+        return {self.input_name: array}
 
 
 def get_onnx_first_input_name(onnx_path: Path) -> str:
@@ -1596,6 +1597,10 @@ def export_onnx_int8_via_ort(
         weight_type=QuantType.QInt8,
         calibrate_method=CalibrationMethod.MinMax,
         per_channel=True,
+        # Keep score/box decoding, Sigmoid, TopK/Gather and concatenated output
+        # in floating point. Quantizing their mixed-unit output can erase scores.
+        op_types_to_quantize=["Conv"],
+        extra_options={"ActivationSymmetric": True, "WeightSymmetric": True},
     )
 
 

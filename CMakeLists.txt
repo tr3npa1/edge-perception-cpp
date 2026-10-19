@@ -82,6 +82,11 @@ option(
     ON
 )
 
+# GPU correctness is opt-in: portable CTest runs never discover or load a
+# machine-specific TensorRT engine implicitly.
+set(EDGE_GPU_TEST_ENGINE "" CACHE FILEPATH "Explicit FP16 engine for GPU correctness CTest")
+set(EDGE_GPU_TEST_IMAGE "" CACHE FILEPATH "Explicit image fixture for GPU correctness CTest")
+
 option(
     EDGE_COPY_RUNTIME_DLLS
     "Copy discovered Windows runtime DLLs beside executables"
@@ -726,6 +731,35 @@ if(EDGE_BUILD_TESTS)
         PRIVATE edge_perception::core
     )
 
+    if(EDGE_ENABLE_CUDA_PIPELINE)
+        target_compile_definitions(
+            edge_perception_core PRIVATE EDGE_ENABLE_GPU_PIPELINE_TESTING=1
+        )
+        add_executable(edge_gpu_correctness_tests tests/test_gpu_correctness.cpp)
+        target_link_libraries(edge_gpu_correctness_tests PRIVATE edge_perception::core)
+
+        if(EDGE_GPU_TEST_ENGINE OR EDGE_GPU_TEST_IMAGE)
+            if(NOT EXISTS "${EDGE_GPU_TEST_ENGINE}" OR NOT EXISTS "${EDGE_GPU_TEST_IMAGE}")
+                message(FATAL_ERROR
+                    "GPU correctness CTest requires existing EDGE_GPU_TEST_ENGINE and EDGE_GPU_TEST_IMAGE paths.")
+            endif()
+            add_test(
+                NAME edge_gpu_fp16_correctness
+                COMMAND edge_gpu_correctness_tests
+                    --engine "${EDGE_GPU_TEST_ENGINE}"
+                    --image "${EDGE_GPU_TEST_IMAGE}"
+            )
+            set_tests_properties(edge_gpu_fp16_correctness PROPERTIES
+                LABELS "integration;gpu;tensorrt;correctness"
+                RUN_SERIAL TRUE
+                TIMEOUT 300
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            )
+        endif()
+    elseif(EDGE_GPU_TEST_ENGINE OR EDGE_GPU_TEST_IMAGE)
+        message(FATAL_ERROR "GPU correctness artifacts require EDGE_ENABLE_CUDA_PIPELINE=ON.")
+    endif()
+
     add_test(
         NAME edge_unit_tests
         COMMAND edge_perception_tests --unit
@@ -909,6 +943,9 @@ edge_copy_runtime_dlls(edge_perception)
 
 if(EDGE_BUILD_TESTS)
     edge_copy_runtime_dlls(edge_perception_tests)
+    if(TARGET edge_gpu_correctness_tests)
+        edge_copy_runtime_dlls(edge_gpu_correctness_tests)
+    endif()
 endif()
 
 # =============================================================================

@@ -45,7 +45,7 @@ import random
 import re
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -126,6 +126,19 @@ class OrtBackendCheck:
 
 
 @dataclass(frozen=True)
+class DetectionMatch:
+    """One class-compatible pair, retained so parity failures are auditable."""
+
+    reference_index: int
+    artifact_index: int
+    reference: Detection
+    artifact: Detection
+    iou: float
+    box_abs_diffs: list[float]
+    conf_abs_diff: float
+
+
+@dataclass(frozen=True)
 class ImageParityResult:
     """PyTorch-vs-artifact final-detection parity result for one image."""
 
@@ -142,6 +155,10 @@ class ImageParityResult:
     mean_conf_abs_diff: float | None
     max_conf_abs_diff: float | None
     passed: bool
+    matched_detections: list[DetectionMatch] = field(default_factory=list)
+    unmatched_reference_detections: list[Detection] = field(default_factory=list)
+    unmatched_artifact_detections: list[Detection] = field(default_factory=list)
+    failure_reasons: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -1479,7 +1496,12 @@ def predict_one_image(
     max_det: int,
     device: str,
 ) -> list[Detection]:
-    """Run prediction on one image and return final detections."""
+    """Run prediction with the same square letterbox used by static exports.
+
+    Ultralytics predict defaults to rect=True, which gives PyTorch a smaller
+    stride-aligned rectangle while static ONNX/TensorRT still receives a square.
+    That compares different input tensors, not just different execution backends.
+    """
 
     results = model.predict(
         source=str(image_path),
@@ -1488,6 +1510,7 @@ def predict_one_image(
         iou=iou,
         max_det=max_det,
         device=device,
+        rect=False,
         verbose=False,
     )
 
@@ -1547,6 +1570,7 @@ def compare_detection_sets(
     matched_box_abs_diffs: list[float] = []
     matched_conf_abs_diffs: list[float] = []
     matched_reference_indices: set[int] = set()
+    matched_detections: list[DetectionMatch] = []
 
     reference_order = sorted(
         range(len(reference_detections)),
@@ -1580,11 +1604,20 @@ def compare_detection_sets(
         unmatched_artifact_indices.remove(best_artifact_index)
         matched_reference_indices.add(reference_index)
         matched_ious.append(best_iou)
-        matched_box_abs_diffs.extend(
-            box_abs_diffs(reference_detection.xyxy, artifact_detection.xyxy)
-        )
-        matched_conf_abs_diffs.append(
-            abs(reference_detection.confidence - artifact_detection.confidence)
+        coordinate_diffs = box_abs_diffs(reference_detection.xyxy, artifact_detection.xyxy)
+        confidence_diff = abs(reference_detection.confidence - artifact_detection.confidence)
+        matched_box_abs_diffs.extend(coordinate_diffs)
+        matched_conf_abs_diffs.append(confidence_diff)
+        matched_detections.append(
+            DetectionMatch(
+                reference_index=reference_index,
+                artifact_index=best_artifact_index,
+                reference=reference_detection,
+                artifact=artifact_detection,
+                iou=best_iou,
+                box_abs_diffs=coordinate_diffs,
+                conf_abs_diff=confidence_diff,
+            )
         )
 
     unmatched_reference_count = len(reference_detections) - len(matched_reference_indices)
@@ -1615,6 +1648,17 @@ def compare_detection_sets(
     )
 
     passed = count_ok and unmatched_ok and iou_ok and box_ok and conf_ok
+    failure_reasons = [
+        name
+        for name, satisfied in (
+            ("detection_count_difference", count_ok),
+            ("unmatched_detections", unmatched_ok),
+            ("mean_matched_iou", iou_ok),
+            ("max_box_abs_diff", box_ok),
+            ("max_conf_abs_diff", conf_ok),
+        )
+        if not satisfied
+    ]
 
     return ImageParityResult(
         image_path=str(image_path),
@@ -1630,6 +1674,16 @@ def compare_detection_sets(
         mean_conf_abs_diff=mean_conf_diff,
         max_conf_abs_diff=max_conf_diff,
         passed=passed,
+        matched_detections=matched_detections,
+        unmatched_reference_detections=[
+            detection
+            for index, detection in enumerate(reference_detections)
+            if index not in matched_reference_indices
+        ],
+        unmatched_artifact_detections=[
+            artifact_detections[index] for index in sorted(unmatched_artifact_indices)
+        ],
+        failure_reasons=failure_reasons,
     )
 
 
@@ -1657,6 +1711,7 @@ def parity_thresholds(args: argparse.Namespace) -> dict[str, Any]:
     """Return parity threshold configuration."""
 
     return {
+        "preprocessing": {"imgsz": args.imgsz, "rect": False},
         "parity_conf": args.parity_conf,
         "parity_iou": args.parity_iou,
         "max_det": args.max_det,
@@ -1886,7 +1941,7 @@ def run_final_detection_parity(
 def validate_required_paths(args: argparse.Namespace) -> None:
     """Validate input paths."""
 
-    requires_weights = args.eval_pytroch or args.parity
+    requires_weights = args.eval_pytorch or args.parity
 
     if requires_weights and not args.weights.is_file():
         raise FileNotFoundError(f"Weights file not found: {args.weights}")

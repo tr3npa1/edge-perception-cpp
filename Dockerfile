@@ -18,7 +18,7 @@
 # intentionally not embedded. Mount them when the container runs.
 # =============================================================================
 
-ARG TENSORRT_CONTAINER=nvcr.io/nvidia/tensorrt:25.03-py3
+ARG TENSORRT_CONTAINER=nvcr.io/nvidia/tensorrt:25.03-py3@sha256:97479e12b6962d351ea001b1b20ee75f3158e60a54b4830c3a26b35af31544ec
 
 
 # =============================================================================
@@ -30,8 +30,7 @@ FROM ${TENSORRT_CONTAINER} AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 ARG ONNXRUNTIME_VERSION=1.26.0
 ARG CUDA_ARCHITECTURES=75
-ARG BUILD_DATE=unknown
-ARG VCS_REF=unknown
+ARG BUILD_JOBS=2
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -65,14 +64,11 @@ RUN apt-get update \
 # Keep these aligned with the validated repository pins.
 # -----------------------------------------------------------------------------
 
-RUN python3 -m pip install \
-        --no-cache-dir \
-        --break-system-packages \
-        "numpy==2.2.6" \
-        "protobuf==6.33.6" \
-        "onnx==1.22.0" \
-        "pytest==9.1.1" \
-        "PyYAML==6.0.3"
+COPY requirements-test.txt /tmp/requirements-test.txt
+RUN python3 -m venv /opt/test-venv \
+    && /opt/test-venv/bin/python -m pip install \
+        --no-cache-dir -r /tmp/requirements-test.txt \
+    && /opt/test-venv/bin/python -m pip check
 
 # -----------------------------------------------------------------------------
 # ONNX Runtime GPU C/C++ distribution
@@ -145,16 +141,19 @@ RUN cmake \
         -DCMAKE_CXX_STANDARD=17 \
         -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" \
         -DCMAKE_INSTALL_PREFIX=/opt/edge-perception \
+        -DPython3_EXECUTABLE=/opt/test-venv/bin/python \
         -DONNXRUNTIME_ROOT=/opt/onnxruntime \
         -DONNXRUNTIME_RUNTIME_DIR=/opt/onnxruntime/lib \
         -DOpenCV_DIR=/usr/lib/x86_64-linux-gnu/cmake/opencv4 \
         -DTENSORRT_ROOT=/usr \
         -DCUDAToolkit_ROOT=/usr/local/cuda \
         -DEDGE_BUILD_TESTS=ON \
+        -DEDGE_BUILD_PYTHON_TESTS=ON \
         -DEDGE_ENABLE_TENSORRT=ON \
         -DEDGE_ENABLE_CUDA_PIPELINE=ON \
         -DEDGE_COPY_RUNTIME_DLLS=OFF \
         -DEDGE_ENABLE_IPO=OFF \
+        -DEDGE_ENABLE_FAST_MATH=OFF \
         -DEDGE_WARNINGS_AS_ERRORS=OFF
 
 # -----------------------------------------------------------------------------
@@ -164,7 +163,7 @@ RUN cmake \
 RUN cmake \
         --build /workspace/build \
         --config Release \
-        --parallel "$(nproc)"
+        --parallel "${BUILD_JOBS}"
 
 # -----------------------------------------------------------------------------
 # Verify that tests are registered
@@ -204,6 +203,13 @@ RUN cmake \
 # Verify the installed executable exists before starting the runtime stage.
 RUN test -x /opt/edge-perception/bin/edge_perception
 
+# Ship corresponding project source and license notices with the executable.
+# These additions happen after compilation and do not change inference code.
+COPY Dockerfile .dockerignore LICENSE LICENSE-EXCEPTION THIRD_PARTY_NOTICES.md requirements*.txt ./
+COPY licenses ./licenses
+COPY tools ./tools
+COPY data/*.py ./data/
+
 
 # =============================================================================
 # Runtime
@@ -214,11 +220,13 @@ FROM ${TENSORRT_CONTAINER} AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
+ARG IMAGE_VERSION=1.1.0
 
 LABEL org.opencontainers.image.title="edge-perception-cpp"
 LABEL org.opencontainers.image.description="Portable ONNX Runtime inference with optional CUDA, TensorRT and fused CUDA acceleration"
 LABEL org.opencontainers.image.source="https://github.com/tr3npa1/edge-perception-cpp"
-LABEL org.opencontainers.image.version="1.1.0"
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.vendor="tr3npa1"
@@ -261,17 +269,17 @@ RUN apt-get update \
 
 COPY --from=builder /opt/onnxruntime /opt/onnxruntime
 COPY --from=builder /opt/edge-perception /opt/edge-perception
+COPY --from=builder /workspace/source /usr/share/edge-perception/source
 
-# trtexec is supplied by the NVIDIA TensorRT base image. Verify that either the
-# command is already available through PATH or that a copy exists in a standard
-# TensorRT location.
-RUN command -v trtexec \
-    || find /opt /usr /workspace \
-        -type f \
-        -name trtexec \
-        -perm -111 \
-        -print \
-        -quit
+# Fail the build if the engine builder is absent. A successful `find` alone
+# would not prove a match, nor make an off-PATH binary runnable by users.
+RUN set -eu; \
+    if ! command -v trtexec >/dev/null; then \
+        trtexec_path="$(find /opt /usr /workspace -type f -name trtexec -perm -111 -print -quit)"; \
+        test -n "${trtexec_path}"; \
+        ln -s "${trtexec_path}" /usr/local/bin/trtexec; \
+    fi; \
+    trtexec --help >/dev/null
 
 RUN useradd \
         --create-home \

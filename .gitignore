@@ -121,6 +121,7 @@ checkpoints/
 *.mlmodel
 
 # Generated inference, evaluation, and benchmark output
+# Curated publication files under docs/results/ remain trackable.
 outputs/
 predictions/
 artifacts/
@@ -203,3 +204,6 @@ tools/apply_*_fix.py
 tools/run_ort_trt_repair.ps1
 run_full_benchmark_fixed.ps1
 run_full_benchmark_matrix.ps1
+
+# Local work handoff; public documentation lives under docs/.
+/NEXT_SESSION.md

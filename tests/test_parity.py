@@ -5,13 +5,17 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from dataclasses import asdict
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
 from training.evaluate import (
     Detection,
     compare_detection_sets,
+    parity_thresholds,
     predict_one_image,
 )
 
@@ -151,6 +155,98 @@ def test_both_empty_pass() -> None:
     assert result.passed
     assert result.matched_detection_count == 0
     assert result.mean_matched_iou is None
+    assert result.failure_reasons == []
+    assert result.matched_detections == []
+
+
+def test_prediction_uses_same_square_input_for_all_backends() -> None:
+    # Model.predict normally injects rect=True. For a 720x1280 image that gives
+    # PyTorch 384x640, while a static exported model still consumes 640x640.
+    # Do not let backend-specific defaults invalidate an equivalence check.
+    for backend in ("pytorch", "onnx", "engine"):
+        model = SimpleNamespace(predict=Mock(return_value=[]))
+        assert predict_one_image(
+            model=model,
+            image_path=Path(f"{backend}.jpg"),
+            imgsz=640,
+            conf=0.25,
+            iou=0.7,
+            max_det=300,
+            device="cpu",
+        ) == []
+        model.predict.assert_called_once_with(
+            source=f"{backend}.jpg",
+            imgsz=640,
+            conf=0.25,
+            iou=0.7,
+            max_det=300,
+            device="cpu",
+            rect=False,
+            verbose=False,
+        )
+
+
+def test_parity_metadata_records_square_preprocessing() -> None:
+    args = SimpleNamespace(
+        imgsz=640,
+        parity_conf=0.25,
+        parity_iou=0.7,
+        max_det=300,
+        parity_match_iou=0.90,
+        parity_min_mean_iou=0.98,
+        parity_max_box_abs_diff=2.0,
+        parity_max_conf_abs_diff=0.02,
+        parity_max_count_diff=1,
+    )
+    assert parity_thresholds(args)["preprocessing"] == {"imgsz": 640, "rect": False}
+
+
+def test_failure_diagnostics_retain_exact_detection_pairs() -> None:
+    reference = [
+        detection(2, 0.95, [10.0, 20.0, 100.0, 120.0]),
+        detection(0, 0.80, [150.0, 40.0, 210.0, 180.0]),
+    ]
+    artifact = [
+        detection(3, 0.80, [150.0, 40.0, 210.0, 180.0]),
+        detection(2, 0.70, [10.5, 20.0, 100.0, 120.0]),
+    ]
+
+    result = compare(reference, artifact)
+
+    assert not result.passed
+    assert result.failure_reasons == ["unmatched_detections", "max_conf_abs_diff"]
+    assert result.unmatched_reference_detections == reference[1:]
+    assert result.unmatched_artifact_detections == artifact[:1]
+    pair = result.matched_detections[0]
+    assert (pair.reference_index, pair.artifact_index) == (0, 1)
+    assert pair.reference == reference[0]
+    assert pair.artifact == artifact[1]
+    assert pair.box_abs_diffs == [0.5, 0.0, 0.0, 0.0]
+    assert pair.conf_abs_diff == pytest.approx(0.25)
+    assert json.loads(json.dumps(asdict(result)))["matched_detections"][0]["reference"] == asdict(reference[0])
+
+
+def test_count_tolerance_does_not_hide_no_matching_detections() -> None:
+    reference = [detection(2, 0.95, [10.0, 20.0, 100.0, 120.0])]
+
+    result = compare(reference, [], max_count_diff=1)
+
+    assert not result.passed
+    assert result.matched_detection_count == 0
+    assert result.unmatched_reference_detections == reference
+    assert result.failure_reasons == [
+        "mean_matched_iou", "max_box_abs_diff", "max_conf_abs_diff"
+    ]
+
+
+def test_count_tolerance_does_not_ignore_confidence_drift() -> None:
+    reference = [detection(2, 0.95, [10.0, 20.0, 100.0, 120.0])]
+    artifact = [detection(2, 0.70, [10.0, 20.0, 100.0, 120.0])]
+
+    result = compare(reference, artifact, max_count_diff=1)
+
+    assert not result.passed
+    assert result.failure_reasons == ["max_conf_abs_diff"]
 
 
 def read_cpp_detections(path: Path) -> list[Detection]:

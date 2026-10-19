@@ -803,6 +803,16 @@ struct BenchmarkResult {
      */
     BenchmarkExecutionCounts counts{};
 
+    /** Execution mechanism, distinct from requested or physical depth. */
+    std::string execution_policy{"synchronous"};
+
+    /**
+     * Maximum worker frame operations simultaneously executing during the
+     * measured phase. This is not proof of overlapping GPU kernels.
+     * Only populated for native_per_slot_workers.
+     */
+    std::optional<std::size_t> maximum_active_workers{};
+
     /**
      * Wall-clock durations for benchmark phases.
      */
@@ -871,6 +881,10 @@ calculate_latency_statistics(
 /**
  * @brief Benchmark the generic preprocessing, inference, and postprocessing
  *        pipeline.
+ *
+ * Native TensorRT streaming uses persistent independent worker slots. Each
+ * owns a context, stream, buffers, graph, and processor; the supplied engine
+ * and processor occupy slot zero. Other backends remain synchronous.
  */
 [[nodiscard]] BenchmarkResult run_benchmark(
     InferenceEngine& engine,

@@ -4,6 +4,20 @@
 !CMakeLists.txt
 !CMakePresets.json
 !pytest.ini
+!requirements-test.txt
+!requirements*.txt
+!Dockerfile
+!.dockerignore
+!LICENSE
+!LICENSE-EXCEPTION
+!THIRD_PARTY_NOTICES.md
+!licenses/
+!licenses/**
+!tools/
+!tools/*.py
+!tools/*.ps1
+!data/
+!data/*.py
 !include/
 !include/**
 !src/
@@ -12,3 +26,10 @@
 !tests/**
 !training/
 !training/**
+
+# Exclude generated Python state even inside the allowlisted source folders.
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+tools/apply_*_fix.py
+tools/run_ort_trt_repair.ps1

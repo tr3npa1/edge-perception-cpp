@@ -1,0 +1,585 @@
+{
+  "schema_version": 1,
+  "run_id": "all_20261018_151027_308",
+  "finished_utc": "2026-10-19T08:07:19.928038+00:00",
+  "local_evidence": "benchmarks/all_20261018_151027_308",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 2060",
+    "gpu_memory": "6144 MiB",
+    "driver": "610.88",
+    "cpu": "AMD Ryzen 5 3600 6-Core Processor",
+    "ram_bytes": 17129492480,
+    "platform": "Windows-10-10.0.26100-SP0"
+  },
+  "packages": {
+    "onnx": "1.22.0",
+    "onnxruntime-gpu": "1.27.0",
+    "torch": "2.12.1+cu130",
+    "ultralytics": "8.4.87",
+    "numpy": "2.2.6",
+    "tensorrt_cu12": "10.9.0.34"
+  },
+  "measured_identity": {
+    "code": {
+      "files": [
+        {
+          "path": "CMakeLists.txt",
+          "sha256": "3dd58505827e8bfa3bce483ecbb0eb71fc9dd800fff839701212f1f80c510a27"
+        },
+        {
+          "path": "CMakePresets.json",
+          "sha256": "9ad0f54b52685dcd272345fa4582e0cd843af798a9aa9df0b054ff33727d3fc8"
+        },
+        {
+          "path": "include/benchmark.hpp",
+          "sha256": "0f1deb4604cdf1e3148dc421dfe2e12a199ef82c47818eccc8ac4b91c35d8cb2"
+        },
+        {
+          "path": "include/engine_artifact.hpp",
+          "sha256": "9eac329e359f9e65a6c3a00da0d6981e8b9809c7331a2d435977df736419240a"
+        },
+        {
+          "path": "include/gpu_pipeline.hpp",
+          "sha256": "3460aafcce8fa6ebf2ddf60d9362d9543b6154cde0f374e7e30d6aeb4410b296"
+        },
+        {
+          "path": "include/image_processor.hpp",
+          "sha256": "97b896d515173b03a9179f8e9bccd814df27d01003b23eff2d677faed6bb1886"
+        },
+        {
+          "path": "include/inference_engine.hpp",
+          "sha256": "ca6dc5b9e5ba78aeed09d274dc4685f2837166f22cb7a67fca8fadd43a902a85"
+        },
+        {
+          "path": "include/postprocess.hpp",
+          "sha256": "3a0fb45782878086fd9c7213314f613907e3aa5837b41362d1574bb89b2da5d4"
+        },
+        {
+          "path": "src/benchmark.cpp",
+          "sha256": "b1c9ab16590a59eddc3aa0f7bc3967c6e911df78262450b0d452d37717f5d2fb"
+        },
+        {
+          "path": "src/gpu_pipeline.cu",
+          "sha256": "8f4c1c8465112418aa4896bccf3e9b68d87b82a0dda121df7b977ee02066c466"
+        },
+        {
+          "path": "src/gpu_pipeline_common.cpp",
+          "sha256": "9f942d8f865cfca1b0b1b7874610b7f68e4caccb342bc6714a28241faa9a462b"
+        },
+        {
+          "path": "src/gpu_pipeline_stub.cpp",
+          "sha256": "f52f6d9541bc3d88d9ec0e87f3ce11a37f54968c1d2a7b2c29362b00a582bac7"
+        },
+        {
+          "path": "src/image_processor.cpp",
+          "sha256": "b09b287765e1599a59b13307986d6bc3f76f1f081790e23283e4cceb4a3c1561"
+        },
+        {
+          "path": "src/inference_engine.cpp",
+          "sha256": "96ba3cb09474dd60e3163dd77ff79099ea52003612bc292a266310437235431e"
+        },
+        {
+          "path": "src/main.cpp",
+          "sha256": "2432411a703aa7ff584ad3307b54a76fa668c52e0b161c5d9e5d1a12b2331620"
+        },
+        {
+          "path": "src/postprocess.cpp",
+          "sha256": "a7e06f8ec0b4abd9985f0ae2bc253af500a7f0b276bdafcb5869a1e48594cb2d"
+        },
+        {
+          "path": "tools/benchmark_fp16_matrix.py",
+          "sha256": "b1594a7e4ce7fabc80b73830114dfbd773ec8ecaf24a77d278889c85c3b616cc"
+        },
+        {
+          "path": "tools/benchmark_release.py",
+          "sha256": "446fad4f0bfa27f467caf78a97e587027dc879a4727ef0fb38eb1fb335b4614f"
+        },
+        {
+          "path": "tools/run_fp16_matrix.ps1",
+          "sha256": "51928949a9802f5ae90bd0372fb362152192eef059864505a42b3c238aeebdba"
+        }
+      ],
+      "sha256": "e9904660acd6913b92ed70d035d5203955e7bd7e45419fc957478277b4169836"
+    },
+    "python_code": {
+      "tests\\generate_test_model.py": "399dbd1db2177b482d56369f43509e5ef3d3a557ba7b9a0aa98d257ca956e0d3",
+      "tests\\gpu_pipeline_test_support.hpp": "f16dd30aa238289c0f6126e739da4fb43723865de1f6f6cc4f8ac1423fd767d2",
+      "tests\\test_all_models.py": "956469ab785c452ed3fadef1f075297b8f4a2913a95cff8dae78566ffb6cb44a",
+      "tests\\test_auto_backend.py": "d6ccf7a7849870848c29b493045b26eb32da12c2d17bf792aacb9f809077ff86",
+      "tests\\test_fp16_matrix.py": "d360f936089cb2730219eb3c483ff2f123ba513395bfced0bbdec51ef8a2f62e",
+      "tests\\test_gpu_correctness.cpp": "7b4668d175fb085059f0c2352d982b1869245897dc8758ba37eaea5f6f7d6b00",
+      "tests\\test_inference.cpp": "b9b4cfc80e65ce301e37e0d3f2971e761b44052cd4c44718670a3012d46411b9",
+      "tests\\test_int8_workflow.py": "f493654fbba44c9f35b82426d6b39dfd548691da94b1718e2215110cf2ede3c5",
+      "tests\\test_parity.py": "5e7201156708c20672c65ceff67bad8b9758e2dfa15946ae24291bfb1b5148e1",
+      "tools\\all_models.py": "bca6c9227a8df0c12a1829f751da65187ea931ad92d2fb141c769473f0abe837",
+      "tools\\all_models_worker.py": "a84f8ba7c2d7f84bff11a4145e0f5536b8b0e72282ee7b3d6b0e07ef71a5da03",
+      "tools\\audit_int8.py": "5d86ff8b10bab54699d1a4507a4cd1358982a53b6e4eedd6c104e90c6b2ae275",
+      "tools\\benchmark_fp16_matrix.py": "b1594a7e4ce7fabc80b73830114dfbd773ec8ecaf24a77d278889c85c3b616cc",
+      "tools\\benchmark_release.py": "446fad4f0bfa27f467caf78a97e587027dc879a4727ef0fb38eb1fb335b4614f",
+      "tools\\check_fp16_parity.py": "0dac80977b7a9a084bbe5c4cac01946de469fd45ee274c9449086cad93a788e4",
+      "tools\\check_fp16_sample_quality.py": "091afc36b5d50de126d13c4d4ce5a7f8848e7aefae25e99fa1af7a9a0f32d607",
+      "tools\\evaluate_release.py": "ffcc6a3cc9e915d7081ba4bde1651067171faae5682ded7bf5585701796cb25c",
+      "tools\\int8_pipeline.py": "eac8288264f8d5c6c42726e02068dd3a3279ac8829b3d65eca147a2b4946f5ce",
+      "tools\\int8_worker.py": "adbfaab5b4d8ae8b4cae2ce4fc07cc41f4bf5d2585fb35f21c04cfd002a330a5",
+      "tools\\promote_int8_artifacts.py": "25e4252e55b7964e34b600353d3e8cebf7623dbf5e39c603d537c40ae988260d",
+      "tools\\publish_results.py": "4c13c96c5f4f74bca016b230a9cac72ea98a613553370aae809b4f1c81714099",
+      "tools\\run_int8_pipeline.ps1": "b346ed7d4a347a9f34795cad018f5bfb1e058f735fc37ef5cc61400fa0328d11",
+      "training\\evaluate.py": "d1e0767609a461afe08a1328fe9eb41d539d5d62bd9838d8532419a5c0415deb",
+      "training\\export_model.py": "0cf97ff1e3e6fc45dbd16f6072c43038281b0b549d7584f6e5010bdcde26861f",
+      "training\\int8_workflow.py": "8c0ffa91cf6724e521e1296035d2f8d147ad1b860739385dcb7873bb0cd64ce9",
+      "training\\train_detector.py": "147be9b3cb41967303151230aec36b633a965407fdf0048e119c678f68115524"
+    },
+    "inputs": {
+      "weights": {
+        "path": "runs/train/yolo26m_bdd100k/weights/best.pt",
+        "bytes": 44036505,
+        "sha256": "12eb53a71b9f5765d1746976c361ca32a00b4a67235d22fa99cddfe98b89f575",
+        "mtime_ns": 1783163366000000000
+      },
+      "data": {
+        "path": "data/processed/bdd100k_yolo/bdd100k.yaml",
+        "bytes": 264,
+        "sha256": "e7bf1787a5605572bef8771466217113cb22254147675f3193d6bc6a1d8665a7",
+        "mtime_ns": 1783277712367264400
+      },
+      "executable": {
+        "path": "build/int8-deployment/bin/Release/edge_perception.exe",
+        "bytes": 534528,
+        "sha256": "05aa84e6c69a61c3f318733c2d14ca94d281cd862454728885db79bbacd42055",
+        "mtime_ns": 1792225834059084500
+      }
+    },
+    "settings": {
+      "models_dir": "models",
+      "weights": "runs/train/yolo26m_bdd100k/weights/best.pt",
+      "data": "data/processed/bdd100k_yolo/bdd100k.yaml",
+      "executable": "build/int8-deployment/bin/Release/edge_perception.exe",
+      "smoke": false,
+      "check_only": false,
+      "device": 0
+    },
+    "build": {
+      "adjacent_libraries": [
+        {
+          "path": "build/int8-deployment/bin/Release/nvinfer_10.dll",
+          "bytes": 440983072,
+          "sha256": "55c7ec9272a4b74830d3caaae9106f277fc7df37690067f69fe1fdfd1dbc52ff",
+          "mtime_ns": 1792225836338673700
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/nvinfer_plugin_10.dll",
+          "bytes": 51002400,
+          "sha256": "420aee53c0c2b4b35e76335daba57e0cabd7e22f2b946e47ed77dfb3019ca5a9",
+          "mtime_ns": 1792225836474010500
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/nvonnxparser_10.dll",
+          "bytes": 2993696,
+          "sha256": "d4ca07f3f392f6f39f1738ed5e615910448d1f98b657551a01c7575881584a2a",
+          "mtime_ns": 1792225838407601500
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/onnxruntime.dll",
+          "bytes": 15837496,
+          "sha256": "cff64bb69859ba556218d64fe3acbc444b971bac9b71b1cb30e8559b277000fb",
+          "mtime_ns": 1792225834168844500
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/onnxruntime_providers_cuda.dll",
+          "bytes": 245956960,
+          "sha256": "872d2af0de752f8448907863051962cef2ad615702d2784ca9fc1fe72bd1898c",
+          "mtime_ns": 1792225837229113200
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/onnxruntime_providers_shared.dll",
+          "bytes": 21856,
+          "sha256": "fbc024360a17ae4948900d2be392fbeafdfc1a8ffd42e32a76eeff09f85c182f",
+          "mtime_ns": 1792225837268766400
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/onnxruntime_providers_tensorrt.dll",
+          "bytes": 849760,
+          "sha256": "437b0c9ddf9ba341eeb6f276bb075c183815c3555e50d831ab720899698b1bb6",
+          "mtime_ns": 1792225837306105000
+        },
+        {
+          "path": "build/int8-deployment/bin/Release/opencv_world4110.dll",
+          "bytes": 64825856,
+          "sha256": "3605a427658597d55310de4ef5bf1ac92ff28df23e01344571fd287d4f1e6dab",
+          "mtime_ns": 1792225834700006800
+        }
+      ],
+      "cache": {
+        "path": "build/int8-deployment/CMakeCache.txt",
+        "bytes": 44805,
+        "sha256": "e167b1caa71e59f7c55a7488eedbe85e7072bbe39d2393c530f44b5aefd3c152",
+        "mtime_ns": 1792226234544514200,
+        "configuration": [
+          "CMAKE_BUILD_TYPE:STRING=Release",
+          "CMAKE_CUDA_ARCHITECTURES:UNINITIALIZED=75",
+          "CMAKE_CUDA_COMPILER:UNINITIALIZED=<external-path>",
+          "CMAKE_CUDA_FLAGS:STRING=-D_WINDOWS -Xcompiler=\" /EHsc\"",
+          "CMAKE_CUDA_FLAGS_DEBUG:STRING=-Xcompiler=\" -Zi -Ob0 -Od /RTC1\"",
+          "CMAKE_CUDA_FLAGS_MINSIZEREL:STRING=-Xcompiler=\"-O1 -Ob1\" -DNDEBUG",
+          "CMAKE_CUDA_FLAGS_RELEASE:STRING=-Xcompiler=\"-O2 -Ob2\" -DNDEBUG",
+          "CMAKE_CUDA_FLAGS_RELWITHDEBINFO:STRING=-Xcompiler=\" -Zi -O2 -Ob1\" -DNDEBUG",
+          "CMAKE_CUDA_HOST_COMPILER:UNINITIALIZED=<external-path>)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.39.33519/bin/Hostx64/x64/cl.exe",
+          "CMAKE_CUDA_STANDARD_LIBRARIES:STRING=kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib",
+          "CMAKE_CXX_COMPILER:UNINITIALIZED=<external-path>)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.39.33519/bin/Hostx64/x64/cl.exe",
+          "CMAKE_PROJECT_COMPAT_VERSION:STATIC=",
+          "CMAKE_PROJECT_VERSION:STATIC=1.1.0",
+          "CMAKE_PROJECT_VERSION_MAJOR:STATIC=1",
+          "CMAKE_PROJECT_VERSION_MINOR:STATIC=1",
+          "CMAKE_PROJECT_VERSION_PATCH:STATIC=0",
+          "CMAKE_PROJECT_VERSION_TWEAK:STATIC=",
+          "CUDAToolkit_CUPTI_INCLUDE_DIR:PATH=<external-path>",
+          "CUDAToolkit_ROOT:UNINITIALIZED=<external-path>",
+          "CUDA_CUDART:FILEPATH=<external-path>",
+          "CUDA_OpenCL_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_bin2c_EXECUTABLE:FILEPATH=<external-path>",
+          "CUDA_cuFile_LIBRARY:FILEPATH=CUDA_cuFile_LIBRARY-NOTFOUND",
+          "CUDA_cuFile_rdma_LIBRARY:FILEPATH=CUDA_cuFile_rdma_LIBRARY-NOTFOUND",
+          "CUDA_cuFile_rdma_static_LIBRARY:FILEPATH=CUDA_cuFile_rdma_static_LIBRARY-NOTFOUND",
+          "CUDA_cuFile_static_LIBRARY:FILEPATH=CUDA_cuFile_static_LIBRARY-NOTFOUND",
+          "CUDA_cublasLt_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cublasLt_static_LIBRARY:FILEPATH=CUDA_cublasLt_static_LIBRARY-NOTFOUND",
+          "CUDA_cublas_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cublas_static_LIBRARY:FILEPATH=CUDA_cublas_static_LIBRARY-NOTFOUND",
+          "CUDA_cuda_driver_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cudart_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cudart_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cudla_LIBRARY:FILEPATH=CUDA_cudla_LIBRARY-NOTFOUND",
+          "CUDA_cufft_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cufft_static_LIBRARY:FILEPATH=CUDA_cufft_static_LIBRARY-NOTFOUND",
+          "CUDA_cufft_static_nocallback_LIBRARY:FILEPATH=CUDA_cufft_static_nocallback_LIBRARY-NOTFOUND",
+          "CUDA_cufftw_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cufftw_static_LIBRARY:FILEPATH=CUDA_cufftw_static_LIBRARY-NOTFOUND",
+          "CUDA_cufilt_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_culibos_LIBRARY:FILEPATH=CUDA_culibos_LIBRARY-NOTFOUND",
+          "CUDA_cupti_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cupti_static_LIBRARY:FILEPATH=CUDA_cupti_static_LIBRARY-NOTFOUND",
+          "CUDA_curand_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_curand_static_LIBRARY:FILEPATH=CUDA_curand_static_LIBRARY-NOTFOUND",
+          "CUDA_cusolver_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cusolver_lapack_static_LIBRARY:FILEPATH=CUDA_cusolver_lapack_static_LIBRARY-NOTFOUND",
+          "CUDA_cusolver_metis_static_LIBRARY:FILEPATH=CUDA_cusolver_metis_static_LIBRARY-NOTFOUND",
+          "CUDA_cusolver_static_LIBRARY:FILEPATH=CUDA_cusolver_static_LIBRARY-NOTFOUND",
+          "CUDA_cusparse_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_cusparse_static_LIBRARY:FILEPATH=CUDA_cusparse_static_LIBRARY-NOTFOUND",
+          "CUDA_nppc_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppc_static_LIBRARY:FILEPATH=CUDA_nppc_static_LIBRARY-NOTFOUND",
+          "CUDA_nppial_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppial_static_LIBRARY:FILEPATH=CUDA_nppial_static_LIBRARY-NOTFOUND",
+          "CUDA_nppicc_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppicc_static_LIBRARY:FILEPATH=CUDA_nppicc_static_LIBRARY-NOTFOUND",
+          "CUDA_nppicom_LIBRARY:FILEPATH=CUDA_nppicom_LIBRARY-NOTFOUND",
+          "CUDA_nppicom_static_LIBRARY:FILEPATH=CUDA_nppicom_static_LIBRARY-NOTFOUND",
+          "CUDA_nppidei_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppidei_static_LIBRARY:FILEPATH=CUDA_nppidei_static_LIBRARY-NOTFOUND",
+          "CUDA_nppif_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppif_static_LIBRARY:FILEPATH=CUDA_nppif_static_LIBRARY-NOTFOUND",
+          "CUDA_nppig_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppig_static_LIBRARY:FILEPATH=CUDA_nppig_static_LIBRARY-NOTFOUND",
+          "CUDA_nppim_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppim_static_LIBRARY:FILEPATH=CUDA_nppim_static_LIBRARY-NOTFOUND",
+          "CUDA_nppist_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppist_static_LIBRARY:FILEPATH=CUDA_nppist_static_LIBRARY-NOTFOUND",
+          "CUDA_nppisu_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppisu_static_LIBRARY:FILEPATH=CUDA_nppisu_static_LIBRARY-NOTFOUND",
+          "CUDA_nppitc_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nppitc_static_LIBRARY:FILEPATH=CUDA_nppitc_static_LIBRARY-NOTFOUND",
+          "CUDA_npps_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_npps_static_LIBRARY:FILEPATH=CUDA_npps_static_LIBRARY-NOTFOUND",
+          "CUDA_nvJitLink_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvJitLink_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvToolsExt_LIBRARY:FILEPATH=CUDA_nvToolsExt_LIBRARY-NOTFOUND",
+          "CUDA_nvfatbin_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvfatbin_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvgraph_LIBRARY:FILEPATH=CUDA_nvgraph_LIBRARY-NOTFOUND",
+          "CUDA_nvgraph_static_LIBRARY:FILEPATH=CUDA_nvgraph_static_LIBRARY-NOTFOUND",
+          "CUDA_nvjpeg_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvjpeg_static_LIBRARY:FILEPATH=CUDA_nvjpeg_static_LIBRARY-NOTFOUND",
+          "CUDA_nvml_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvml_static_LIBRARY:FILEPATH=CUDA_nvml_static_LIBRARY-NOTFOUND",
+          "CUDA_nvperf_host_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvperf_host_static_LIBRARY:FILEPATH=CUDA_nvperf_host_static_LIBRARY-NOTFOUND",
+          "CUDA_nvperf_target_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvptxcompiler_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvrtc_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvrtc_builtins_LIBRARY:FILEPATH=CUDA_nvrtc_builtins_LIBRARY-NOTFOUND",
+          "CUDA_nvrtc_builtins_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_nvrtc_static_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_pcsamplingutil_LIBRARY:FILEPATH=<external-path>",
+          "CUDA_sanitizer_LIBRARY:FILEPATH=<external-path>",
+          "EDGE_ENABLE_CUDA_PIPELINE:BOOL=ON",
+          "EDGE_ENABLE_TENSORRT:BOOL=ON",
+          "ONNXRUNTIME_DLL:FILEPATH=<external-path>",
+          "ONNXRUNTIME_INCLUDE_DIR:PATH=<external-path>",
+          "ONNXRUNTIME_LIBRARY:FILEPATH=<external-path>",
+          "ONNXRUNTIME_ROOT:PATH=<external-path>",
+          "ONNXRUNTIME_RUNTIME_DIR:PATH=<external-path>",
+          "OpenCV_DIR:UNINITIALIZED=<external-path>",
+          "TENSORRT_INCLUDE_DIR:PATH=<external-path>",
+          "TENSORRT_NVINFER_DLL:FILEPATH=<external-path>",
+          "TENSORRT_NVINFER_LIBRARY:FILEPATH=<external-path>",
+          "TENSORRT_ONNXPARSER_DLL:FILEPATH=<external-path>",
+          "TENSORRT_PLUGIN_DLL:FILEPATH=<external-path>",
+          "TENSORRT_PLUGIN_LIBRARY:FILEPATH=<external-path>",
+          "TENSORRT_ROOT:PATH=<external-path>",
+          "CMAKE_CACHE_MAJOR_VERSION:INTERNAL=4",
+          "CMAKE_CACHE_MINOR_VERSION:INTERNAL=4",
+          "CMAKE_CACHE_PATCH_VERSION:INTERNAL=0",
+          "CMAKE_CUDA_COMPILER-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_FLAGS-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_FLAGS_DEBUG-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_FLAGS_RELEASE-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_HOST_COMPILER-ADVANCED:INTERNAL=1",
+          "CMAKE_CUDA_STANDARD_LIBRARIES-ADVANCED:INTERNAL=1",
+          "CMAKE_CXX_COMPILER-ADVANCED:INTERNAL=1",
+          "CUDAToolkit_CUPTI_INCLUDE_DIR-ADVANCED:INTERNAL=1",
+          "CUDA_CUDART-ADVANCED:INTERNAL=1",
+          "CUDA_OpenCL_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cuFile_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cuFile_rdma_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cuFile_rdma_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cuFile_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cublasLt_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cublasLt_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cublas_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cublas_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cuda_driver_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cudart_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cudart_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cudla_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufft_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufft_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufft_static_nocallback_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufftw_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufftw_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cufilt_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_culibos_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cupti_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cupti_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_curand_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_curand_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusolver_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusolver_lapack_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusolver_metis_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusolver_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusparse_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_cusparse_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppc_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppc_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppial_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppial_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppicc_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppicc_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppicom_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppicom_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppidei_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppidei_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppif_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppif_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppig_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppig_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppim_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppim_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppist_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppist_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppisu_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppisu_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppitc_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nppitc_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_npps_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_npps_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvJitLink_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvJitLink_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvToolsExt_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvfatbin_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvfatbin_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvgraph_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvgraph_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvjpeg_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvjpeg_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvml_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvml_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvperf_host_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvperf_host_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvperf_target_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvptxcompiler_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvrtc_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvrtc_builtins_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvrtc_builtins_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_nvrtc_static_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_pcsamplingutil_LIBRARY-ADVANCED:INTERNAL=1",
+          "CUDA_sanitizer_LIBRARY-ADVANCED:INTERNAL=1",
+          "FIND_PACKAGE_MESSAGE_DETAILS_CUDAToolkit:INTERNAL=[<external-path>)]",
+          "FIND_PACKAGE_MESSAGE_DETAILS_OpenCV:INTERNAL=[<external-path>)]"
+        ]
+      }
+    },
+    "gpu_test": {
+      "path": "build/int8-deployment/bin/Release/edge_gpu_correctness_tests.exe",
+      "bytes": 408576,
+      "sha256": "d992e37d2bcc3e9af996e3a4ea42dac00dc29d966236dc78d752456f437142ae",
+      "mtime_ns": 1792225834059084500
+    },
+    "packages": {
+      "onnx": "1.22.0",
+      "onnxruntime-gpu": "1.27.0",
+      "torch": "2.12.1+cu130",
+      "ultralytics": "8.4.87",
+      "numpy": "2.2.6",
+      "tensorrt_cu12": "10.9.0.34"
+    },
+    "artifacts": [
+      {
+        "label": "pytorch",
+        "artifact_type": "pytorch",
+        "precision": "fp32",
+        "path": "runs/train/yolo26m_bdd100k/weights/best.pt",
+        "bytes": 44036505,
+        "sha256": "12eb53a71b9f5765d1746976c361ca32a00b4a67235d22fa99cddfe98b89f575",
+        "mtime_ns": 1783163366000000000,
+        "aliases": []
+      },
+      {
+        "path": "models/onnx/yolo26m_bdd100k_fp16.onnx",
+        "bytes": 40948315,
+        "sha256": "c1f59c2f221668bf3a53e9f862137e167a788dba9b1944e872f95b1eb14fd4dd",
+        "mtime_ns": 1783174852000000000,
+        "id": "onnx_yolo26m_bdd100k_fp16",
+        "artifact_type": "onnx",
+        "precision": "fp16",
+        "aliases": [],
+        "label": "onnx_fp16"
+      },
+      {
+        "path": "models/onnx/yolo26m_bdd100k_fp32.onnx",
+        "bytes": 81746289,
+        "sha256": "9699532764f803cc6f159490961bdd491bb280a7bfe26a0b8894797679ec6a99",
+        "mtime_ns": 1783174770000000000,
+        "id": "onnx_yolo26m_bdd100k_fp32",
+        "artifact_type": "onnx",
+        "precision": "fp32",
+        "aliases": [
+          {
+            "path": "models/onnx/yolo26m_bdd100k_allconv_fp32.onnx",
+            "bytes": 81746289,
+            "sha256": "9699532764f803cc6f159490961bdd491bb280a7bfe26a0b8894797679ec6a99",
+            "mtime_ns": 1783174770000000000
+          },
+          {
+            "path": "models/onnx/yolo26m_bdd100k_convonly_fp32.onnx",
+            "bytes": 81746289,
+            "sha256": "9699532764f803cc6f159490961bdd491bb280a7bfe26a0b8894797679ec6a99",
+            "mtime_ns": 1783174770000000000
+          }
+        ],
+        "label": "onnx_fp32"
+      },
+      {
+        "path": "models/onnx/yolo26m_bdd100k_int8.onnx",
+        "bytes": 25193855,
+        "sha256": "fe9d637ae579ba3b6627ae2cbc4f5a8657374d057fa1746afc18ece8947766b5",
+        "mtime_ns": 1792296879016093100,
+        "id": "onnx_yolo26m_bdd100k_int8",
+        "artifact_type": "onnx",
+        "precision": "int8",
+        "aliases": [],
+        "label": "onnx_int8"
+      },
+      {
+        "path": "models/engine/yolo26m_bdd100k_fp16.engine",
+        "bytes": 44619628,
+        "sha256": "f124d3ac205dc6143ac7427bb5acc22d922c8b1a7ff1eca43be22e5474879432",
+        "mtime_ns": 1783333715507109400,
+        "id": "engine_yolo26m_bdd100k_fp16",
+        "artifact_type": "engine",
+        "precision": "fp16",
+        "aliases": [],
+        "label": "engine_fp16"
+      },
+      {
+        "path": "models/engine/yolo26m_bdd100k_fp32.engine",
+        "bytes": 94825476,
+        "sha256": "25fb1569fa8571c6df8c4324ff2016d05a3e1f3d72c15cf98eece239bd0f029f",
+        "mtime_ns": 1783333428900319800,
+        "id": "engine_yolo26m_bdd100k_fp32",
+        "artifact_type": "engine",
+        "precision": "fp32",
+        "aliases": [],
+        "label": "engine_fp32"
+      },
+      {
+        "path": "models/engine/yolo26m_bdd100k_int8.engine",
+        "bytes": 28400926,
+        "sha256": "cc9f664cd55f0e580481dc6a21ec1b843bf22d3a4a5676a458dfe03d013f0295",
+        "mtime_ns": 1792297324750112200,
+        "id": "engine_yolo26m_bdd100k_int8",
+        "artifact_type": "engine",
+        "precision": "int8",
+        "aliases": [],
+        "label": "engine_int8"
+      },
+      {
+        "path": "models/onnx/yolo26m_bdd100k_allconv_int8.onnx",
+        "bytes": 21074205,
+        "sha256": "779bc8cdfe398999498563b6579882a2ee721cee65d65b30cffd50a99cbb74c2",
+        "mtime_ns": 1783396248297300500,
+        "id": "onnx_yolo26m_bdd100k_allconv_int8",
+        "artifact_type": "onnx",
+        "precision": "int8",
+        "aliases": [],
+        "label": "onnx_allconv_int8"
+      }
+    ],
+    "launcher": {
+      "path": "tools/run_all_models.ps1",
+      "bytes": 5871,
+      "sha256": "cde9091093bbe4071d4f39c387140d32d59b7be6c88f19cfc1f278b160d34fab",
+      "mtime_ns": 1792314490811055600
+    },
+    "promotion": {
+      "path": "models/int8_active.json",
+      "bytes": 7998,
+      "sha256": "0ed7bf241d882284138c4338bfa67e0500ca8fdf80831eab5ac1fc96ecda7606",
+      "mtime_ns": 1792303247752131800
+    }
+  },
+  "performance_settings": {
+    "executable": "build/int8-deployment/bin/Release/edge_perception.exe",
+    "output": "benchmarks/all_20261018_151027_308/performance",
+    "source": "benchmarks/all_20261018_151027_308/frames",
+    "models_dir": "models",
+    "repetitions": 3,
+    "warmup": 50,
+    "latency_iterations": 300,
+    "throughput_iterations": 1000,
+    "stage_iterations": 100,
+    "source_frames": 128,
+    "timeout_seconds": 3600,
+    "device": 0,
+    "resume": false,
+    "only_backends": null,
+    "graph_ablation": true
+  },
+  "source_files": [
+    {
+      "path": "benchmarks/all_20261018_151027_308/pipeline/manifest.json",
+      "sha256": "12f60b1f009fc93be036d9f2e5aecd325df17b7248e387cb5291fac5ff712cf4"
+    },
+    {
+      "path": "benchmarks/all_20261018_151027_308/pipeline/summary.json",
+      "sha256": "a37609b6a0f288d70521825ca2fa100eeefcaad0d44e72ee07925053ba3bcf89"
+    },
+    {
+      "path": "benchmarks/all_20261018_151027_308/performance/manifest.json",
+      "sha256": "9f84e5827b5ac3e603d6500cb03b7bf356da19d61769140c4894c2bc03c18c4e"
+    }
+  ],
+  "resumed": true,
+  "scope": "Native Windows; local source snapshot identified by hashes, not a clean-commit claim"
+}

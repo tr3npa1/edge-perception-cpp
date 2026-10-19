@@ -1,61 +1,84 @@
-# Backend Matrix
+# Backend compatibility and model contract
 
-This document defines the deployment-backend truth table for `edge-perception-cpp`.
+[Results](results/README.md) · [Setup](USAGE.md)
 
-The project does **not** try to force every artifact into every runtime. Instead, it evaluates the backend combinations that are technically meaningful and documents the one known unsupported combination.
+## Runtime routes
 
-## Artifact families
+| Artifact | ORT CPU | ORT CUDA | ORT TensorRT EP | Native TensorRT | Fused CUDA/TensorRT |
+|---|---|---|---|---|---|
+| ONNX FP32 | Measured | Measured | Measured | — | — |
+| ONNX FP16 | Measured | Measured | Measured | — | — |
+| Canonical ONNX INT8 QDQ | Measured | Measured | Rejected by project policy | — | — |
+| Legacy all-convolution ONNX INT8 | Measured | Measured | Rejected by project policy | — | — |
+| TensorRT FP32 | — | — | — | Measured | Measured |
+| TensorRT FP16 | — | — | — | Measured | Measured |
+| TensorRT INT8 | — | — | — | Measured | Measured |
 
-| Artifact family | File pattern | Purpose |
-|---|---|---|
-| PyTorch checkpoint | `runs/train/yolo26m_bdd100k/weights/best.pt` | Training baseline and quality reference |
-| ONNX FP32 | `models/onnx/yolo26m_bdd100k_fp32.onnx` | Portable full-precision ONNX deployment |
-| ONNX FP16 | `models/onnx/yolo26m_bdd100k_fp16.onnx` | Mixed-precision ONNX deployment |
-| ONNX INT8 QDQ | `models/onnx/yolo26m_bdd100k_int8.onnx` | ONNX Runtime quantized deployment experiments |
-| Native TensorRT engine FP32 | `models/engine/yolo26m_bdd100k_fp32.engine` | Direct TensorRT FP32 baseline |
-| Native TensorRT engine FP16 | `models/engine/yolo26m_bdd100k_fp16.engine` | Direct TensorRT FP16 optimized baseline |
-| Native TensorRT engine INT8 | `models/engine/yolo26m_bdd100k_int8.engine` | Direct TensorRT INT8 optimized baseline |
-| Native TensorRT engine INT8 traincalib | `models/engine/yolo26m_bdd100k_int8_traincalib.engine` | Direct TensorRT INT8 with train-split calibration |
+“Measured” means successful execution plus full-test quality and timing evidence,
+not universal equivalence. The PyTorch checkpoint is a Python reference, not a
+C++ CLI backend. ORT TensorRT can partition work across TensorRT/CUDA/CPU;
+provider initialization alone does not establish node placement.
 
-## Supported backend checks
+`auto` selects an ONNX execution provider with session-creation fallback.
+Explicit backend requests fail visibly. Neither policy makes a TensorRT engine
+portable or implements arbitrary mid-inference GPU-to-CPU recovery.
 
-| Artifact | ORT CPU | ORT CUDA | ORT TensorRT EP | Native TensorRT runtime |
+## Artifacts
+
+| Role | Repository-relative path |
+|---|---|
+| Trained reference | `runs/train/yolo26m_bdd100k/weights/best.pt` |
+| ONNX reference/deployment | `models/onnx/yolo26m_bdd100k_{fp32,fp16,int8}.onnx` |
+| Native engines | `models/engine/yolo26m_bdd100k_{fp32,fp16,int8}.engine` |
+| Legacy quantization comparison | `models/onnx/yolo26m_bdd100k_allconv_int8.onnx` |
+| Accepted INT8 registry | `models/int8_active.json` |
+
+Braces above denote separate filenames, not literal names. Artifact hashes are
+in [provenance.json](results/provenance.json). FP32 allconv/convonly aliases are
+byte-identical in the measured inventory and are counted once. Superseded
+artifacts are archived outside active discovery under `models/archive/`.
+
+Weights/engines are not distributed with the repository. Re-exported artifacts
+need their own hashes and measurements.
+
+## Detector contract
+
+The deployed model uses batch-1, square 640×640, planar NCHW input and NMS-free
+`[1,300,6]` output rows containing boxes, confidence and class ID. Preprocessing
+letterboxes with padding 114, converts BGR to RGB and normalizes input. Both
+CPU and CUDA paths restore boxes to original-image coordinates.
+
+The pipeline validates tensor shapes/types and buffer sizes; there is no extra
+NMS pass applied to this already-decoded output. A generic raw YOLO head or
+arbitrary model is not a drop-in replacement.
+
+Native engine bindings may be FP32 or FP16. INT8 describes internal mixed
+precision, not necessarily integer input/output tensors. Raw plans and validated
+Ultralytics metadata-prefixed engines are accepted; model bytes are not modified.
+
+## Measured same-artifact parity
+
+| C++ path | FP32 | FP16 | Canonical INT8 | Legacy INT8 |
 |---|---:|---:|---:|---:|
-| PyTorch `best.pt` | N/A | N/A | N/A | N/A |
-| ONNX FP32 | Required | Required | Required | N/A |
-| ONNX FP16 | Measured | Required | Required | N/A |
-| ONNX INT8 QDQ | Required | Required | Skipped by design | N/A |
-| TensorRT engine FP32 | N/A | N/A | N/A | Required |
-| TensorRT engine FP16 | N/A | N/A | N/A | Required |
-| TensorRT engine INT8 | N/A | N/A | N/A | Required |
-| TensorRT engine INT8 traincalib | N/A | N/A | N/A | Optional/Recommended |
+| ORT CPU | 64/64 | 57/64 | 1/64 | 1/64 |
+| ORT CUDA | 64/64 | 64/64 | 64/64 | 64/64 |
+| ORT TensorRT EP | 64/64 | 48/64 | Unsupported | Unsupported |
+| Native TensorRT | 64/64 | 64/64 | 64/64 | — |
+| Fused TensorRT | 64/64 | 64/64 | 64/64 | — |
 
-## Known unsupported combination
+These compare each path with the same artifact through Python on 64 images.
+FP16/INT8 comparison against the original PyTorch checkpoint is a separate,
+stricter equivalence question with retained failures.
+[Gate definitions](results/fp16-correctness.md#comparison-gates).
 
-```text
-ONNX INT8 QDQ + ONNX Runtime TensorRT Execution Provider
-```
+Full-test C++ native/fused mAP50–95 is 34.0161 (FP32), 34.0120 (FP16) and
+33.2609 (INT8). Full quality results—not empty-output parity alone—establish
+that the active INT8 artifacts produce useful detections on this dataset.
 
-This combination is skipped for the current YOLO26M graph.
+## Platform boundaries
 
-During local debugging, the saved ONNX graph could pass graph-level checks, but ORT TensorRT EP still emitted TensorRT parser failures involving generated `Conv_bias_dq` nodes. That indicates a backend-conversion compatibility issue rather than a training or dataset issue.
-
-The correct TensorRT INT8 path for this project is:
-
-```text
-PyTorch best.pt
-→ native TensorRT INT8 engine export/calibration
-→ native TensorRT runtime / Ultralytics engine validation
-```
-
-## Why this is still production-quality
-
-Production deployment work is not about making every theoretical runtime combination work. It is about:
-
-1. choosing valid runtime paths,
-2. checking provider fallback explicitly,
-3. documenting unsupported combinations,
-4. validating accuracy per artifact,
-5. benchmarking end-to-end latency fairly.
-
-This matrix is the contract used by `training/evaluate.py`, the README, and the C++ benchmark suite.
+The published evidence is native Windows on the recorded RTX 2060 stack.
+Engines must be built for their target GPU/OS/runtime. Linux CPU CI is configured;
+[container build and execution checks](DOCKER.md#validation-boundary) are
+documented separately. Full-dataset Linux GPU quality/performance is not
+established by the Windows evidence.

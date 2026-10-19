@@ -1,4 +1,5 @@
 #include "inference_engine.hpp"
+#include "engine_artifact.hpp"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -1059,7 +1060,9 @@ public:
         check_cuda(
             cudaStreamBeginCapture(
                 stream,
-                cudaStreamCaptureModeGlobal
+                // Independent engine instances may capture on different
+                // worker threads. Each owns its stream and all captured buffers.
+                cudaStreamCaptureModeThreadLocal
             ),
             "cudaStreamBeginCapture"
         );
@@ -2312,11 +2315,12 @@ public:
 
         const std::vector<std::uint8_t> serialized_engine =
             read_binary_file(config_.artifact_path);
+        const TensorRtPayload payload = tensorrt_payload(serialized_engine);
 
         engine_.reset(
             runtime_->deserializeCudaEngine(
-                serialized_engine.data(),
-                serialized_engine.size()
+                payload.data,
+                payload.size
             )
         );
 

@@ -4,10 +4,15 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <condition_variable>
+#include <deque>
 #include <exception>
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <future>
+#include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -15,6 +20,10 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+
+#if defined(EDGE_WITH_TENSORRT) && EDGE_WITH_TENSORRT
+#include <cuda_runtime_api.h>
+#endif
 
 namespace edge {
 namespace {
@@ -375,6 +384,7 @@ void finalize_throughput(
     if (
         config.mode == BenchmarkMode::StreamingThroughput
         && config.pipeline_depth != 1U
+        && engine.runtime_info().backend != InferenceBackend::NativeTensorRt
     ) {
         add_warning_once(
             result,
@@ -570,6 +580,252 @@ struct GenericFrameOutcome final {
     return outcome;
 }
 
+// Each worker has an independent TensorRT context, stream, device workspace,
+// pinned I/O, CUDA graph and CPU preprocessing scratch. No engine.run() call
+// shares mutable state with another slot. The immutable decoded frames and
+// postprocessor configuration are the only shared input data.
+class NativeBenchmarkWorkers final {
+public:
+    struct Job {
+        const cv::Mat* frame = nullptr;
+        std::uint64_t iteration = 0U;
+        std::size_t source = 0U;
+        bool measured = false;
+    };
+
+    NativeBenchmarkWorkers(InferenceEngine& engine, ImageProcessor& processor,
+                           const Postprocessor& postprocessor,
+                           const BenchmarkConfig& config)
+        : postprocessor_(postprocessor), config_(config) {
+        // Finish all allocation/deserialization before any graph capture.
+        for (std::size_t i = 0; i < config.pipeline_depth; ++i) {
+            auto slot = std::make_unique<Slot>();
+            if (i == 0U) {
+                slot->engine = &engine;
+                slot->processor = &processor;
+            } else {
+                slot->owned_engine = std::make_unique<InferenceEngine>(engine.config());
+                slot->owned_processor = std::make_unique<ImageProcessor>(processor.config());
+                slot->engine = slot->owned_engine.get();
+                slot->processor = slot->owned_processor.get();
+                validate_generic_target_contract(*slot->engine, *slot->processor);
+            }
+            slots_.push_back(std::move(slot));
+        }
+        try {
+            for (auto& slot : slots_) {
+                std::promise<void> initialized;
+                auto ready = initialized.get_future();
+                slot->worker = std::thread([this, target = slot.get(),
+                                           signal = std::move(initialized)]() mutable {
+                    try {
+#if defined(EDGE_WITH_TENSORRT) && EDGE_WITH_TENSORRT
+                        const cudaError_t error = cudaSetDevice(target->engine->config().gpu.device_id);
+                        if (error != cudaSuccess) {
+                            throw std::runtime_error(std::string{"Native worker cudaSetDevice: "}
+                                + cudaGetErrorString(error));
+                        }
+                        signal.set_value();
+#else
+                        throw std::runtime_error("Native TensorRT workers are not compiled.");
+#endif
+                    } catch (...) {
+                        signal.set_exception(std::current_exception());
+                        return;
+                    }
+#if defined(EDGE_WITH_TENSORRT) && EDGE_WITH_TENSORRT
+                    worker_loop(*target);
+#endif
+                });
+                ready.get();
+            }
+        } catch (...) {
+            stop_and_join();
+            throw;
+        }
+    }
+
+    ~NativeBenchmarkWorkers() { stop_and_join(); }
+    NativeBenchmarkWorkers(const NativeBenchmarkWorkers&) = delete;
+    NativeBenchmarkWorkers& operator=(const NativeBenchmarkWorkers&) = delete;
+
+    void submit(std::size_t index, Job job) {
+        {
+            std::lock_guard<std::mutex> lock{mutex_};
+            Slot& slot = *slots_.at(index);
+            if (slot.busy) {
+                throw std::logic_error("Native benchmark slot reused before collection.");
+            }
+            slot.busy = true;
+            slot.job = job;
+        }
+        changed_.notify_all();
+    }
+
+    GenericFrameOutcome collect(std::size_t index) {
+        std::unique_lock<std::mutex> lock{mutex_};
+        Slot& slot = *slots_.at(index);
+        changed_.wait(lock, [&slot] { return slot.outcome.has_value(); });
+        auto outcome = std::move(*slot.outcome);
+        slot.outcome.reset();
+        slot.busy = false;
+        // BenchmarkConfig bounds the slot count to eight before construction.
+        outcome.sample.pipeline_slot_index = static_cast<std::uint32_t>(index);
+        return outcome;
+    }
+
+    [[nodiscard]] std::size_t maximum_active_workers() const noexcept {
+        return maximum_active_.load(std::memory_order_relaxed);
+    }
+
+private:
+    struct Slot {
+        std::unique_ptr<InferenceEngine> owned_engine{};
+        std::unique_ptr<ImageProcessor> owned_processor{};
+        InferenceEngine* engine = nullptr;
+        ImageProcessor* processor = nullptr;
+        std::thread worker{};
+        std::optional<Job> job{};
+        std::optional<GenericFrameOutcome> outcome{};
+        bool busy = false;
+    };
+
+    void worker_loop(Slot& slot) {
+        for (;;) {
+            Job job{};
+            {
+                std::unique_lock<std::mutex> lock{mutex_};
+                changed_.wait(lock, [this, &slot] { return stopping_ || slot.job.has_value(); });
+                if (!slot.job.has_value()) {
+                    return;
+                }
+                job = *slot.job;
+                slot.job.reset();
+            }
+            if (job.measured) {
+                const std::size_t active = active_.fetch_add(1U, std::memory_order_relaxed) + 1U;
+                std::size_t maximum = maximum_active_.load(std::memory_order_relaxed);
+                while (maximum < active && !maximum_active_.compare_exchange_weak(
+                    maximum, active, std::memory_order_relaxed)) {}
+            }
+            GenericFrameOutcome outcome = execute_generic_frame(
+                *slot.engine, *slot.processor, postprocessor_, *job.frame,
+                job.iteration, job.source, config_, job.measured);
+            if (job.measured) {
+                active_.fetch_sub(1U, std::memory_order_relaxed);
+            }
+            {
+                std::lock_guard<std::mutex> lock{mutex_};
+                slot.outcome = std::move(outcome);
+            }
+            changed_.notify_all();
+        }
+    }
+
+    void stop_and_join() noexcept {
+        {
+            std::lock_guard<std::mutex> lock{mutex_};
+            stopping_ = true;
+        }
+        changed_.notify_all();
+        // Accepted jobs finish before any engine/buffer can be destroyed,
+        // including cancellation and exceptions thrown by caller callbacks.
+        for (auto& slot : slots_) {
+            if (slot->worker.joinable()) {
+                slot->worker.join();
+            }
+        }
+    }
+
+    const Postprocessor& postprocessor_;
+    const BenchmarkConfig& config_;
+    std::vector<std::unique_ptr<Slot>> slots_{};
+    std::mutex mutex_{};
+    std::condition_variable changed_{};
+    bool stopping_ = false;
+    std::atomic<std::size_t> active_{0U};
+    std::atomic<std::size_t> maximum_active_{0U};
+};
+
+[[nodiscard]] bool process_native_streaming_phase(
+    NativeBenchmarkWorkers& workers, const std::vector<cv::Mat>& frames,
+    BenchmarkPhase phase, BenchmarkPhaseCounts& counts, BenchmarkResult& result,
+    DurationSeries& series, const BenchmarkControl& control, bool measured,
+    BenchmarkCompletionStatus& stop_status
+) {
+    struct Pending {
+        std::size_t slot;
+        BenchmarkTimePoint arrival;
+    };
+    std::deque<Pending> pending;
+    std::uint64_t next = 0U;
+    bool stop = false;
+    std::optional<BenchmarkTimePoint> phase_start;
+    std::optional<BenchmarkTimePoint> last_complete;
+    // Like the fused scheduler, one ready frame may wait for a free slot.
+    std::optional<BenchmarkTimePoint> next_arrival;
+    report_progress(control, phase, counts, 0U, result.effective_pipeline_depth);
+    while ((!stop && next < counts.requested) || !pending.empty()) {
+        if (!stop && cancellation_requested(control)) {
+            stop = true;
+            stop_status = BenchmarkCompletionStatus::Cancelled;
+        }
+        if (!stop && next < counts.requested && !next_arrival) {
+            next_arrival = BenchmarkClock::now();
+            if (!phase_start) phase_start = next_arrival;
+        }
+        if (!stop && next < counts.requested
+            && pending.size() < result.effective_pipeline_depth) {
+            const std::size_t slot = static_cast<std::size_t>(next % result.effective_pipeline_depth);
+            std::size_t source = 0U;
+            const cv::Mat& frame = select_frame(frames, next, source);
+            workers.submit(slot, {&frame, next, source, measured});
+            pending.push_back({slot, *next_arrival});
+            next_arrival.reset();
+            ++next;
+            ++counts.attempted;
+            report_progress(control, phase, counts, pending.size(), result.effective_pipeline_depth);
+            continue;
+        }
+        if (pending.empty()) break;
+        const Pending current = pending.front();
+        pending.pop_front();
+        GenericFrameOutcome outcome = workers.collect(current.slot);
+        last_complete = BenchmarkClock::now();
+        if (outcome.sample.submitted) ++counts.submitted;
+        if (outcome.sample.completed) {
+            ++counts.completed;
+            if (measured) {
+                // Arrival-to-observed-completion includes queueing and host
+                // scheduling, just as for the fused streaming API.
+                if (result.config.timing_scope == BenchmarkTimingScope::EndToEnd
+                    || result.config.collect_stage_timings) {
+                    outcome.sample.timings.end_to_end = elapsed(current.arrival, *last_complete);
+                }
+                append_completed_sample(series, outcome.sample, result.config.timing_scope);
+            }
+        } else {
+            ++counts.failed;
+            record_failure(result, phase, outcome.sample.iteration_index,
+                outcome.sample.source_frame_index, std::nullopt,
+                outcome.operation, outcome.failure_message);
+            if (result.config.failure_policy == BenchmarkFailurePolicy::StopOnFirstFailure) {
+                stop = true;
+                stop_status = BenchmarkCompletionStatus::StoppedOnFailure;
+            }
+        }
+        if (measured && result.config.retain_raw_samples) {
+            result.samples.push_back(std::move(outcome.sample));
+        }
+        report_progress(control, phase, counts, pending.size(), result.effective_pipeline_depth);
+    }
+    if (phase_start && last_complete) {
+        if (measured) result.phase_durations.measurement = elapsed(*phase_start, *last_complete);
+        else result.phase_durations.warmup = elapsed(*phase_start, *last_complete);
+    }
+    return stop_status == BenchmarkCompletionStatus::NotStarted;
+}
+
 [[nodiscard]] bool process_generic_phase(
     InferenceEngine& engine,
     ImageProcessor& image_processor,
@@ -711,6 +967,8 @@ struct GenericFrameOutcome final {
         pipeline.config(),
         pipeline.runtime_info()
     };
+    result.execution_policy = config.mode == BenchmarkMode::StreamingThroughput
+        ? "fused_submit_collect" : "synchronous";
     result.effective_pipeline_depth =
         config.mode == BenchmarkMode::SynchronousLatency
             ? 1U
@@ -2879,6 +3137,22 @@ BenchmarkResult run_benchmark(
     BenchmarkCompletionStatus stop_status =
         BenchmarkCompletionStatus::NotStarted;
 
+    const bool native_streaming =
+        config.mode == BenchmarkMode::StreamingThroughput
+        && engine.runtime_info().backend == InferenceBackend::NativeTensorRt;
+    std::unique_ptr<NativeBenchmarkWorkers> workers;
+    if (native_streaming) {
+        result.effective_pipeline_depth = config.pipeline_depth;
+        result.execution_policy = "native_per_slot_workers";
+        workers = std::make_unique<NativeBenchmarkWorkers>(
+            engine, image_processor, postprocessor, config);
+        add_warning_once(result,
+            "Native streaming uses independent engines/contexts, nonblocking "
+            "CUDA streams, buffers and persistent CPU workers per slot. Target "
+            "memory metadata describes one slot, not all deserialized engines. "
+            "Concurrent worker activity does not guarantee GPU kernel overlap.");
+    }
+
     report_progress(
         control,
         BenchmarkPhase::Setup,
@@ -2887,7 +3161,11 @@ BenchmarkResult run_benchmark(
         result.effective_pipeline_depth
     );
 
-    const bool warmup_completed = process_generic_phase(
+    const bool warmup_completed = native_streaming
+        ? process_native_streaming_phase(
+            *workers, frames, BenchmarkPhase::Warmup, result.counts.warmup,
+            result, duration_series, control, false, stop_status)
+        : process_generic_phase(
         engine,
         image_processor,
         postprocessor,
@@ -2902,7 +3180,13 @@ BenchmarkResult run_benchmark(
     );
 
     if (warmup_completed) {
-        static_cast<void>(process_generic_phase(
+        if (native_streaming) {
+            static_cast<void>(process_native_streaming_phase(
+                *workers, frames, BenchmarkPhase::Measurement,
+                result.counts.measurement, result, duration_series,
+                control, true, stop_status));
+        } else {
+            static_cast<void>(process_generic_phase(
             engine,
             image_processor,
             postprocessor,
@@ -2914,7 +3198,12 @@ BenchmarkResult run_benchmark(
             control,
             true,
             stop_status
-        ));
+            ));
+        }
+    }
+
+    if (workers) {
+        result.maximum_active_workers = workers->maximum_active_workers();
     }
 
     result.status = stop_status == BenchmarkCompletionStatus::NotStarted
@@ -3087,6 +3376,8 @@ std::string format_benchmark_summary(
            << "  effective pipeline depth: "
            << result.effective_pipeline_depth
            << '\n'
+           << "  execution policy: " << result.execution_policy
+           << '\n'
            << "  warmup requested/attempted/completed/failed: "
            << result.counts.warmup.requested << '/'
            << result.counts.warmup.attempted << '/'
@@ -3183,6 +3474,13 @@ std::string benchmark_result_to_json(
     output.put(',');
     write_json_key(output, "effective_pipeline_depth");
     output << result.effective_pipeline_depth << ',';
+    write_json_key(output, "execution_policy");
+    write_json_string(output, result.execution_policy);
+    output.put(',');
+    write_json_key(output, "maximum_active_workers");
+    if (result.maximum_active_workers) output << *result.maximum_active_workers;
+    else output << "null";
+    output.put(',');
     write_json_key(output, "config");
     write_benchmark_config_json(output, result.config);
     output.put(',');

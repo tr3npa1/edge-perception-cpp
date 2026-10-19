@@ -1,0 +1,2717 @@
+{
+  "scale": "0-100 in CSV; original metric fields are 0-1",
+  "paths": {
+    "python_pytorch": {
+      "images": 20000,
+      "detections": 3659045,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312703573794449,
+      "metrics/recall(B)": 0.5436336366316988,
+      "metrics/mAP50(B)": 0.6005488407267138,
+      "metrics/mAP50-95(B)": 0.3401613081821604,
+      "fitness": 0.3401613081821604,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57176,
+          "Box-F1": 0.61329,
+          "mAP50": 0.61429,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68657,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70386,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_onnx_fp16": {
+      "images": 20000,
+      "detections": 3662825,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7309617542058697,
+      "metrics/recall(B)": 0.5436715521496064,
+      "metrics/mAP50(B)": 0.6004782214265882,
+      "metrics/mAP50-95(B)": 0.33980330519062646,
+      "fitness": 0.33980330519062646,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75261,
+          "Box-R": 0.59489,
+          "Box-F1": 0.66452,
+          "mAP50": 0.67543,
+          "mAP50-95": 0.35187
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70508,
+          "Box-R": 0.48609,
+          "Box-F1": 0.57546,
+          "mAP50": 0.53986,
+          "mAP50-95": 0.27983
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.80568,
+          "Box-R": 0.75327,
+          "Box-F1": 0.7786,
+          "mAP50": 0.81916,
+          "mAP50-95": 0.50588
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66005,
+          "Box-R": 0.57227,
+          "Box-F1": 0.61303,
+          "mAP50": 0.61435,
+          "mAP50-95": 0.469
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68666,
+          "Box-R": 0.61236,
+          "Box-F1": 0.64739,
+          "mAP50": 0.66245,
+          "mAP50-95": 0.48068
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62394,
+          "Box-R": 0.53403,
+          "Box-F1": 0.5755,
+          "mAP50": 0.55473,
+          "mAP50-95": 0.27662
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67041,
+          "Box-R": 0.50309,
+          "Box-F1": 0.57482,
+          "mAP50": 0.53599,
+          "mAP50-95": 0.26881
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69081,
+          "Box-R": 0.68738,
+          "Box-F1": 0.68909,
+          "mAP50": 0.70113,
+          "mAP50-95": 0.28045
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71436,
+          "Box-R": 0.69333,
+          "Box-F1": 0.70369,
+          "mAP50": 0.73382,
+          "mAP50-95": 0.39655
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_onnx_fp32": {
+      "images": 20000,
+      "detections": 3658984,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312705418176063,
+      "metrics/recall(B)": 0.5436335213404725,
+      "metrics/mAP50(B)": 0.6005488478679722,
+      "metrics/mAP50-95(B)": 0.3401614551129346,
+      "fitness": 0.3401614551129346,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57176,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68656,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70386,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_onnx_int8": {
+      "images": 20000,
+      "detections": 3669582,
+      "targets": 367728,
+      "metrics/precision(B)": 0.6996024387082928,
+      "metrics/recall(B)": 0.5517267471054168,
+      "metrics/mAP50(B)": 0.5859076725998605,
+      "metrics/mAP50-95(B)": 0.3290927632619637,
+      "fitness": 0.3290927632619637,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.70967,
+          "Box-R": 0.59939,
+          "Box-F1": 0.64989,
+          "mAP50": 0.66123,
+          "mAP50-95": 0.34104
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.67631,
+          "Box-R": 0.47309,
+          "Box-F1": 0.55673,
+          "mAP50": 0.51972,
+          "mAP50-95": 0.26868
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.76453,
+          "Box-R": 0.76717,
+          "Box-F1": 0.76585,
+          "mAP50": 0.81471,
+          "mAP50-95": 0.50062
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.62959,
+          "Box-R": 0.57591,
+          "Box-F1": 0.60156,
+          "mAP50": 0.60468,
+          "mAP50-95": 0.4606
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.6455,
+          "Box-R": 0.62638,
+          "Box-F1": 0.63579,
+          "mAP50": 0.65303,
+          "mAP50-95": 0.4706
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.56091,
+          "Box-R": 0.54154,
+          "Box-F1": 0.55106,
+          "mAP50": 0.5351,
+          "mAP50-95": 0.26635
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.65143,
+          "Box-R": 0.4887,
+          "Box-F1": 0.55845,
+          "mAP50": 0.52029,
+          "mAP50-95": 0.25779
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.67131,
+          "Box-R": 0.68828,
+          "Box-F1": 0.67969,
+          "mAP50": 0.69575,
+          "mAP50-95": 0.27668
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.68678,
+          "Box-R": 0.69588,
+          "Box-F1": 0.6913,
+          "mAP50": 0.72574,
+          "mAP50-95": 0.39083
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.06092,
+          "Box-F1": 0.11484,
+          "mAP50": 0.12882,
+          "mAP50-95": 0.05775
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_engine_fp16": {
+      "images": 20000,
+      "detections": 3663280,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7307928463464999,
+      "metrics/recall(B)": 0.5438061894794525,
+      "metrics/mAP50(B)": 0.6004796338049143,
+      "metrics/mAP50-95(B)": 0.34014447493161704,
+      "fitness": 0.34014447493161704,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.7527,
+          "Box-R": 0.59505,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67524,
+          "mAP50-95": 0.35202
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70273,
+          "Box-R": 0.48609,
+          "Box-F1": 0.57467,
+          "mAP50": 0.53938,
+          "mAP50-95": 0.28016
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8056,
+          "Box-R": 0.75354,
+          "Box-F1": 0.7787,
+          "mAP50": 0.81932,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.6609,
+          "Box-R": 0.57196,
+          "Box-F1": 0.61322,
+          "mAP50": 0.61445,
+          "mAP50-95": 0.46909
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68634,
+          "Box-R": 0.61215,
+          "Box-F1": 0.64713,
+          "mAP50": 0.6622,
+          "mAP50-95": 0.48076
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62311,
+          "Box-R": 0.53303,
+          "Box-F1": 0.57456,
+          "mAP50": 0.55562,
+          "mAP50-95": 0.27705
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67124,
+          "Box-R": 0.50535,
+          "Box-F1": 0.5766,
+          "mAP50": 0.53556,
+          "mAP50-95": 0.2694
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69087,
+          "Box-R": 0.6877,
+          "Box-F1": 0.68928,
+          "mAP50": 0.70159,
+          "mAP50-95": 0.28096
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71443,
+          "Box-R": 0.69319,
+          "Box-F1": 0.70365,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39748
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16759,
+          "mAP50-95": 0.08822
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_engine_fp32": {
+      "images": 20000,
+      "detections": 3659045,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312707604062672,
+      "metrics/recall(B)": 0.5436340621565584,
+      "metrics/mAP50(B)": 0.6005487356962711,
+      "metrics/mAP50-95(B)": 0.34016141256377563,
+      "fitness": 0.34016141256377563,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57177,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68656,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70387,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_engine_int8": {
+      "images": 20000,
+      "detections": 3826783,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7243458301681213,
+      "metrics/recall(B)": 0.540887323658592,
+      "metrics/mAP50(B)": 0.5892805348380874,
+      "metrics/mAP50-95(B)": 0.3326163617217011,
+      "fitness": 0.3326163617217011,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74926,
+          "Box-R": 0.58247,
+          "Box-F1": 0.65542,
+          "mAP50": 0.66399,
+          "mAP50-95": 0.34337
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.69036,
+          "Box-R": 0.4721,
+          "Box-F1": 0.56074,
+          "mAP50": 0.52523,
+          "mAP50-95": 0.27123
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.79523,
+          "Box-R": 0.75288,
+          "Box-F1": 0.77348,
+          "mAP50": 0.8156,
+          "mAP50-95": 0.50244
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.65897,
+          "Box-R": 0.56574,
+          "Box-F1": 0.60881,
+          "mAP50": 0.60816,
+          "mAP50-95": 0.46326
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.66817,
+          "Box-R": 0.61535,
+          "Box-F1": 0.64067,
+          "mAP50": 0.65501,
+          "mAP50-95": 0.47527
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.59673,
+          "Box-R": 0.52352,
+          "Box-F1": 0.55773,
+          "mAP50": 0.53565,
+          "mAP50-95": 0.26428
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.68809,
+          "Box-R": 0.48514,
+          "Box-F1": 0.56906,
+          "mAP50": 0.52536,
+          "mAP50-95": 0.26233
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.68988,
+          "Box-R": 0.6789,
+          "Box-F1": 0.68435,
+          "mAP50": 0.69689,
+          "mAP50-95": 0.27846
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.70677,
+          "Box-R": 0.68723,
+          "Box-F1": 0.69686,
+          "mAP50": 0.72761,
+          "mAP50-95": 0.39315
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.04554,
+          "Box-F1": 0.0871,
+          "mAP50": 0.1393,
+          "mAP50-95": 0.07238
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "python_onnx_allconv_int8": {
+      "images": 20000,
+      "detections": 3151103,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7285559257183922,
+      "metrics/recall(B)": 0.4899911459046969,
+      "metrics/mAP50(B)": 0.5380797708027598,
+      "metrics/mAP50-95(B)": 0.28601049385125515,
+      "fitness": 0.28601049385125515,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74795,
+          "Box-R": 0.54507,
+          "Box-F1": 0.63059,
+          "mAP50": 0.62623,
+          "mAP50-95": 0.30859
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.74917,
+          "Box-R": 0.4289,
+          "Box-F1": 0.5455,
+          "mAP50": 0.49592,
+          "mAP50-95": 0.23439
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.75436,
+          "Box-R": 0.74685,
+          "Box-F1": 0.75058,
+          "mAP50": 0.7852,
+          "mAP50-95": 0.44538
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.73245,
+          "Box-R": 0.49357,
+          "Box-F1": 0.58974,
+          "mAP50": 0.55938,
+          "mAP50-95": 0.40854
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.71679,
+          "Box-R": 0.53445,
+          "Box-F1": 0.61233,
+          "mAP50": 0.58686,
+          "mAP50-95": 0.39993
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.59797,
+          "Box-R": 0.45395,
+          "Box-F1": 0.51611,
+          "mAP50": 0.47909,
+          "mAP50-95": 0.2239
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67087,
+          "Box-R": 0.40666,
+          "Box-F1": 0.50637,
+          "mAP50": 0.4646,
+          "mAP50-95": 0.21989
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.63537,
+          "Box-R": 0.61749,
+          "Box-F1": 0.6263,
+          "mAP50": 0.59696,
+          "mAP50-95": 0.22173
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.68064,
+          "Box-R": 0.67297,
+          "Box-F1": 0.67678,
+          "mAP50": 0.66925,
+          "mAP50-95": 0.3328
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.11731,
+          "mAP50-95": 0.06496
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp16__ort-cpu": {
+      "images": 20000,
+      "detections": 3662554,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7311850474853672,
+      "metrics/recall(B)": 0.5438265967318696,
+      "metrics/mAP50(B)": 0.6006988744733669,
+      "metrics/mAP50-95(B)": 0.3398227874674254,
+      "fitness": 0.3398227874674254,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75244,
+          "Box-R": 0.59465,
+          "Box-F1": 0.6643,
+          "mAP50": 0.67531,
+          "mAP50-95": 0.35179
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70369,
+          "Box-R": 0.48609,
+          "Box-F1": 0.57499,
+          "mAP50": 0.53988,
+          "mAP50-95": 0.28032
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.80569,
+          "Box-R": 0.75323,
+          "Box-F1": 0.77858,
+          "mAP50": 0.81917,
+          "mAP50-95": 0.5059
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66063,
+          "Box-R": 0.57196,
+          "Box-F1": 0.61311,
+          "mAP50": 0.61423,
+          "mAP50-95": 0.46855
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68679,
+          "Box-R": 0.61243,
+          "Box-F1": 0.64748,
+          "mAP50": 0.66251,
+          "mAP50-95": 0.48062
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62296,
+          "Box-R": 0.53303,
+          "Box-F1": 0.5745,
+          "mAP50": 0.55526,
+          "mAP50-95": 0.27691
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67408,
+          "Box-R": 0.50662,
+          "Box-F1": 0.57847,
+          "mAP50": 0.53812,
+          "mAP50-95": 0.26881
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69113,
+          "Box-R": 0.6874,
+          "Box-F1": 0.68926,
+          "mAP50": 0.70116,
+          "mAP50-95": 0.28043
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71444,
+          "Box-R": 0.69287,
+          "Box-F1": 0.70349,
+          "mAP50": 0.73351,
+          "mAP50-95": 0.39659
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16784,
+          "mAP50-95": 0.08832
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp16__ort-cuda": {
+      "images": 20000,
+      "detections": 3662825,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7309626395803535,
+      "metrics/recall(B)": 0.5436722375689067,
+      "metrics/mAP50(B)": 0.6004761199500074,
+      "metrics/mAP50-95(B)": 0.33980333893020964,
+      "fitness": 0.33980333893020964,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75262,
+          "Box-R": 0.5949,
+          "Box-F1": 0.66453,
+          "mAP50": 0.67544,
+          "mAP50-95": 0.35188
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70508,
+          "Box-R": 0.48609,
+          "Box-F1": 0.57546,
+          "mAP50": 0.5398,
+          "mAP50-95": 0.27982
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.80568,
+          "Box-R": 0.75327,
+          "Box-F1": 0.7786,
+          "mAP50": 0.81917,
+          "mAP50-95": 0.50588
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66005,
+          "Box-R": 0.57227,
+          "Box-F1": 0.61303,
+          "mAP50": 0.61433,
+          "mAP50-95": 0.469
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68666,
+          "Box-R": 0.61236,
+          "Box-F1": 0.64739,
+          "mAP50": 0.66251,
+          "mAP50-95": 0.4807
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62394,
+          "Box-R": 0.53403,
+          "Box-F1": 0.5755,
+          "mAP50": 0.55471,
+          "mAP50-95": 0.27661
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67041,
+          "Box-R": 0.50309,
+          "Box-F1": 0.57482,
+          "mAP50": 0.53598,
+          "mAP50-95": 0.2688
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69081,
+          "Box-R": 0.68738,
+          "Box-F1": 0.68909,
+          "mAP50": 0.70115,
+          "mAP50-95": 0.28046
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71436,
+          "Box-R": 0.69333,
+          "Box-F1": 0.70369,
+          "mAP50": 0.73382,
+          "mAP50-95": 0.39656
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp16__ort-trt": {
+      "images": 20000,
+      "detections": 3663267,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7310219466686468,
+      "metrics/recall(B)": 0.5439215143060807,
+      "metrics/mAP50(B)": 0.6006345701620973,
+      "metrics/mAP50-95(B)": 0.33927550027886005,
+      "fitness": 0.33927550027886005,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.7524,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66441,
+          "mAP50": 0.67538,
+          "mAP50-95": 0.35173
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.7044,
+          "Box-R": 0.48616,
+          "Box-F1": 0.57528,
+          "mAP50": 0.53964,
+          "mAP50-95": 0.27981
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.80546,
+          "Box-R": 0.75333,
+          "Box-F1": 0.77852,
+          "mAP50": 0.81918,
+          "mAP50-95": 0.50591
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66082,
+          "Box-R": 0.57171,
+          "Box-F1": 0.61304,
+          "mAP50": 0.6146,
+          "mAP50-95": 0.46884
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68657,
+          "Box-R": 0.61259,
+          "Box-F1": 0.64747,
+          "mAP50": 0.66244,
+          "mAP50-95": 0.4807
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62312,
+          "Box-R": 0.53458,
+          "Box-F1": 0.57547,
+          "mAP50": 0.55529,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67237,
+          "Box-R": 0.50535,
+          "Box-F1": 0.57702,
+          "mAP50": 0.53729,
+          "mAP50-95": 0.26888
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69085,
+          "Box-R": 0.68762,
+          "Box-F1": 0.68923,
+          "mAP50": 0.70124,
+          "mAP50-95": 0.28036
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71423,
+          "Box-R": 0.69301,
+          "Box-F1": 0.70346,
+          "mAP50": 0.73362,
+          "mAP50-95": 0.39665
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16767,
+          "mAP50-95": 0.08307
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp32__ort-cpu": {
+      "images": 20000,
+      "detections": 3659041,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312704588921257,
+      "metrics/recall(B)": 0.5436338022938723,
+      "metrics/mAP50(B)": 0.6005487460344915,
+      "metrics/mAP50-95(B)": 0.3401614032283485,
+      "fitness": 0.3401614032283485,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57177,
+          "Box-F1": 0.61329,
+          "mAP50": 0.61429,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68657,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70387,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp32__ort-cuda": {
+      "images": 20000,
+      "detections": 3658984,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312705419483416,
+      "metrics/recall(B)": 0.5436335214898955,
+      "metrics/mAP50(B)": 0.6005488447646824,
+      "metrics/mAP50-95(B)": 0.34016144916139884,
+      "fitness": 0.34016144916139884,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57176,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68656,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70386,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_fp32__ort-trt": {
+      "images": 20000,
+      "detections": 3659046,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312697636048555,
+      "metrics/recall(B)": 0.5436331095869147,
+      "metrics/mAP50(B)": 0.6005493612771581,
+      "metrics/mAP50-95(B)": 0.3401614842479455,
+      "fitness": 0.3401614842479455,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77876,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57176,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68657,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55552,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70386,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_int8__ort-cpu": {
+      "images": 20000,
+      "detections": 3669336,
+      "targets": 367728,
+      "metrics/precision(B)": 0.716675025700874,
+      "metrics/recall(B)": 0.5412997284380182,
+      "metrics/mAP50(B)": 0.5868136471226452,
+      "metrics/mAP50-95(B)": 0.3292835305443865,
+      "fitness": 0.3292835305443865,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.72996,
+          "Box-R": 0.58734,
+          "Box-F1": 0.65093,
+          "mAP50": 0.66073,
+          "mAP50-95": 0.34071
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.69606,
+          "Box-R": 0.46899,
+          "Box-F1": 0.5604,
+          "mAP50": 0.52084,
+          "mAP50-95": 0.26941
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.78523,
+          "Box-R": 0.75719,
+          "Box-F1": 0.77095,
+          "mAP50": 0.81481,
+          "mAP50-95": 0.50059
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.6417,
+          "Box-R": 0.57063,
+          "Box-F1": 0.60408,
+          "mAP50": 0.60489,
+          "mAP50-95": 0.46106
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.6587,
+          "Box-R": 0.61569,
+          "Box-F1": 0.63647,
+          "mAP50": 0.65366,
+          "mAP50-95": 0.47151
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.58451,
+          "Box-R": 0.52949,
+          "Box-F1": 0.55564,
+          "mAP50": 0.53678,
+          "mAP50-95": 0.26604
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.6755,
+          "Box-R": 0.48019,
+          "Box-F1": 0.56134,
+          "mAP50": 0.52138,
+          "mAP50-95": 0.25666
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69158,
+          "Box-R": 0.67376,
+          "Box-F1": 0.68255,
+          "mAP50": 0.69538,
+          "mAP50-95": 0.27679
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.70352,
+          "Box-R": 0.68564,
+          "Box-F1": 0.69446,
+          "mAP50": 0.72578,
+          "mAP50-95": 0.39075
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.04408,
+          "Box-F1": 0.08444,
+          "mAP50": 0.13388,
+          "mAP50-95": 0.05932
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_int8__ort-cuda": {
+      "images": 20000,
+      "detections": 3669582,
+      "targets": 367728,
+      "metrics/precision(B)": 0.699602438664838,
+      "metrics/recall(B)": 0.5517267469892773,
+      "metrics/mAP50(B)": 0.5859076538658565,
+      "metrics/mAP50-95(B)": 0.3290927748403189,
+      "fitness": 0.3290927748403189,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.70967,
+          "Box-R": 0.59939,
+          "Box-F1": 0.64989,
+          "mAP50": 0.66123,
+          "mAP50-95": 0.34104
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.67631,
+          "Box-R": 0.47309,
+          "Box-F1": 0.55673,
+          "mAP50": 0.51972,
+          "mAP50-95": 0.26868
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.76453,
+          "Box-R": 0.76717,
+          "Box-F1": 0.76585,
+          "mAP50": 0.81471,
+          "mAP50-95": 0.50062
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.62959,
+          "Box-R": 0.57591,
+          "Box-F1": 0.60156,
+          "mAP50": 0.60468,
+          "mAP50-95": 0.4606
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.6455,
+          "Box-R": 0.62638,
+          "Box-F1": 0.63579,
+          "mAP50": 0.65303,
+          "mAP50-95": 0.4706
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.56091,
+          "Box-R": 0.54154,
+          "Box-F1": 0.55106,
+          "mAP50": 0.5351,
+          "mAP50-95": 0.26635
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.65143,
+          "Box-R": 0.4887,
+          "Box-F1": 0.55845,
+          "mAP50": 0.52029,
+          "mAP50-95": 0.25779
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.67131,
+          "Box-R": 0.68828,
+          "Box-F1": 0.67969,
+          "mAP50": 0.69575,
+          "mAP50-95": 0.27668
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.68678,
+          "Box-R": 0.69588,
+          "Box-F1": 0.6913,
+          "mAP50": 0.72574,
+          "mAP50-95": 0.39083
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.06092,
+          "Box-F1": 0.11484,
+          "mAP50": 0.12882,
+          "mAP50-95": 0.05775
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_fp16__native-trt": {
+      "images": 20000,
+      "detections": 3663280,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7307995058763769,
+      "metrics/recall(B)": 0.5438104024907445,
+      "metrics/mAP50(B)": 0.6004446948078211,
+      "metrics/mAP50-95(B)": 0.3401204027948003,
+      "fitness": 0.3401204027948003,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.7527,
+          "Box-R": 0.59505,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67525,
+          "mAP50-95": 0.35202
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70282,
+          "Box-R": 0.48615,
+          "Box-F1": 0.57474,
+          "mAP50": 0.53931,
+          "mAP50-95": 0.28017
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8056,
+          "Box-R": 0.75354,
+          "Box-F1": 0.7787,
+          "mAP50": 0.81932,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.6609,
+          "Box-R": 0.57196,
+          "Box-F1": 0.61322,
+          "mAP50": 0.61444,
+          "mAP50-95": 0.4691
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68632,
+          "Box-R": 0.61213,
+          "Box-F1": 0.64711,
+          "mAP50": 0.66222,
+          "mAP50-95": 0.48076
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62311,
+          "Box-R": 0.53303,
+          "Box-F1": 0.57456,
+          "mAP50": 0.55549,
+          "mAP50-95": 0.27689
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67124,
+          "Box-R": 0.50535,
+          "Box-F1": 0.5766,
+          "mAP50": 0.53544,
+          "mAP50-95": 0.26933
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69087,
+          "Box-R": 0.6877,
+          "Box-F1": 0.68928,
+          "mAP50": 0.70158,
+          "mAP50-95": 0.28095
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71443,
+          "Box-R": 0.69319,
+          "Box-F1": 0.70365,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39748
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16757,
+          "mAP50-95": 0.08821
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_fp16__fused-trt": {
+      "images": 20000,
+      "detections": 3663280,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7307995058763769,
+      "metrics/recall(B)": 0.5438104024907445,
+      "metrics/mAP50(B)": 0.6004446948078211,
+      "metrics/mAP50-95(B)": 0.3401204027948003,
+      "fitness": 0.3401204027948003,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.7527,
+          "Box-R": 0.59505,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67525,
+          "mAP50-95": 0.35202
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70282,
+          "Box-R": 0.48615,
+          "Box-F1": 0.57474,
+          "mAP50": 0.53931,
+          "mAP50-95": 0.28017
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8056,
+          "Box-R": 0.75354,
+          "Box-F1": 0.7787,
+          "mAP50": 0.81932,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.6609,
+          "Box-R": 0.57196,
+          "Box-F1": 0.61322,
+          "mAP50": 0.61444,
+          "mAP50-95": 0.4691
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68632,
+          "Box-R": 0.61213,
+          "Box-F1": 0.64711,
+          "mAP50": 0.66222,
+          "mAP50-95": 0.48076
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62311,
+          "Box-R": 0.53303,
+          "Box-F1": 0.57456,
+          "mAP50": 0.55549,
+          "mAP50-95": 0.27689
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67124,
+          "Box-R": 0.50535,
+          "Box-F1": 0.5766,
+          "mAP50": 0.53544,
+          "mAP50-95": 0.26933
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69087,
+          "Box-R": 0.6877,
+          "Box-F1": 0.68928,
+          "mAP50": 0.70158,
+          "mAP50-95": 0.28095
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71443,
+          "Box-R": 0.69319,
+          "Box-F1": 0.70365,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39748
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16757,
+          "mAP50-95": 0.08821
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_fp32__native-trt": {
+      "images": 20000,
+      "detections": 3659045,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312707603782204,
+      "metrics/recall(B)": 0.5436340622375286,
+      "metrics/mAP50(B)": 0.60054872224507,
+      "metrics/mAP50-95(B)": 0.34016141047714377,
+      "fitness": 0.34016141047714377,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57177,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68656,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70387,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_fp32__fused-trt": {
+      "images": 20000,
+      "detections": 3659045,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7312707603782204,
+      "metrics/recall(B)": 0.5436340622375286,
+      "metrics/mAP50(B)": 0.60054872224507,
+      "metrics/mAP50-95(B)": 0.34016141047714377,
+      "fitness": 0.34016141047714377,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.75304,
+          "Box-R": 0.59485,
+          "Box-F1": 0.66466,
+          "mAP50": 0.67532,
+          "mAP50-95": 0.35208
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.70342,
+          "Box-R": 0.48609,
+          "Box-F1": 0.5749,
+          "mAP50": 0.53936,
+          "mAP50-95": 0.28007
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.8061,
+          "Box-R": 0.75322,
+          "Box-F1": 0.77877,
+          "mAP50": 0.81936,
+          "mAP50-95": 0.5063
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.66132,
+          "Box-R": 0.57177,
+          "Box-F1": 0.61329,
+          "mAP50": 0.6143,
+          "mAP50-95": 0.46906
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.68656,
+          "Box-R": 0.61225,
+          "Box-F1": 0.64728,
+          "mAP50": 0.66229,
+          "mAP50-95": 0.48074
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.62366,
+          "Box-R": 0.53353,
+          "Box-F1": 0.57509,
+          "mAP50": 0.55551,
+          "mAP50-95": 0.2768
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67199,
+          "Box-R": 0.50426,
+          "Box-F1": 0.57617,
+          "mAP50": 0.53594,
+          "mAP50-95": 0.26979
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.69156,
+          "Box-R": 0.68735,
+          "Box-F1": 0.68945,
+          "mAP50": 0.70172,
+          "mAP50-95": 0.28103
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.71505,
+          "Box-R": 0.69302,
+          "Box-F1": 0.70387,
+          "mAP50": 0.73383,
+          "mAP50-95": 0.39742
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.16786,
+          "mAP50-95": 0.08833
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_int8__native-trt": {
+      "images": 20000,
+      "detections": 3826783,
+      "targets": 367728,
+      "metrics/precision(B)": 0.724243271674627,
+      "metrics/recall(B)": 0.5408167961618957,
+      "metrics/mAP50(B)": 0.5892725787673954,
+      "metrics/mAP50-95(B)": 0.3326092775988002,
+      "fitness": 0.3326092775988002,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74926,
+          "Box-R": 0.58247,
+          "Box-F1": 0.65542,
+          "mAP50": 0.66397,
+          "mAP50-95": 0.34337
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.68935,
+          "Box-R": 0.47141,
+          "Box-F1": 0.55992,
+          "mAP50": 0.52525,
+          "mAP50-95": 0.27123
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.79523,
+          "Box-R": 0.75288,
+          "Box-F1": 0.77348,
+          "mAP50": 0.81561,
+          "mAP50-95": 0.50243
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.65897,
+          "Box-R": 0.56574,
+          "Box-F1": 0.60881,
+          "mAP50": 0.60815,
+          "mAP50-95": 0.46325
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.66817,
+          "Box-R": 0.61535,
+          "Box-F1": 0.64067,
+          "mAP50": 0.65505,
+          "mAP50-95": 0.47528
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.59673,
+          "Box-R": 0.52352,
+          "Box-F1": 0.55773,
+          "mAP50": 0.5356,
+          "mAP50-95": 0.26428
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.68809,
+          "Box-R": 0.48514,
+          "Box-F1": 0.56906,
+          "mAP50": 0.52531,
+          "mAP50-95": 0.26227
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.68988,
+          "Box-R": 0.6789,
+          "Box-F1": 0.68435,
+          "mAP50": 0.69689,
+          "mAP50-95": 0.27845
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.70676,
+          "Box-R": 0.68722,
+          "Box-F1": 0.69685,
+          "mAP50": 0.7276,
+          "mAP50-95": 0.39315
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.04554,
+          "Box-F1": 0.0871,
+          "mAP50": 0.1393,
+          "mAP50-95": 0.07238
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "engine_int8__fused-trt": {
+      "images": 20000,
+      "detections": 3826783,
+      "targets": 367728,
+      "metrics/precision(B)": 0.724243271674627,
+      "metrics/recall(B)": 0.5408167961618957,
+      "metrics/mAP50(B)": 0.5892725787673954,
+      "metrics/mAP50-95(B)": 0.3326092775988002,
+      "fitness": 0.3326092775988002,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74926,
+          "Box-R": 0.58247,
+          "Box-F1": 0.65542,
+          "mAP50": 0.66397,
+          "mAP50-95": 0.34337
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.68935,
+          "Box-R": 0.47141,
+          "Box-F1": 0.55992,
+          "mAP50": 0.52525,
+          "mAP50-95": 0.27123
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.79523,
+          "Box-R": 0.75288,
+          "Box-F1": 0.77348,
+          "mAP50": 0.81561,
+          "mAP50-95": 0.50243
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.65897,
+          "Box-R": 0.56574,
+          "Box-F1": 0.60881,
+          "mAP50": 0.60815,
+          "mAP50-95": 0.46325
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.66817,
+          "Box-R": 0.61535,
+          "Box-F1": 0.64067,
+          "mAP50": 0.65505,
+          "mAP50-95": 0.47528
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.59673,
+          "Box-R": 0.52352,
+          "Box-F1": 0.55773,
+          "mAP50": 0.5356,
+          "mAP50-95": 0.26428
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.68809,
+          "Box-R": 0.48514,
+          "Box-F1": 0.56906,
+          "mAP50": 0.52531,
+          "mAP50-95": 0.26227
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.68988,
+          "Box-R": 0.6789,
+          "Box-F1": 0.68435,
+          "mAP50": 0.69689,
+          "mAP50-95": 0.27845
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.70676,
+          "Box-R": 0.68722,
+          "Box-F1": 0.69685,
+          "mAP50": 0.7276,
+          "mAP50-95": 0.39315
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.04554,
+          "Box-F1": 0.0871,
+          "mAP50": 0.1393,
+          "mAP50-95": 0.07238
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_allconv_int8__ort-cpu": {
+      "images": 20000,
+      "detections": 3149107,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7341621925707716,
+      "metrics/recall(B)": 0.49236250545199695,
+      "metrics/mAP50(B)": 0.5399481869373505,
+      "metrics/mAP50-95(B)": 0.286619005159645,
+      "fitness": 0.286619005159645,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74699,
+          "Box-R": 0.54434,
+          "Box-F1": 0.62976,
+          "mAP50": 0.62796,
+          "mAP50-95": 0.30953
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.75478,
+          "Box-R": 0.42101,
+          "Box-F1": 0.54052,
+          "mAP50": 0.4971,
+          "mAP50-95": 0.23894
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.75457,
+          "Box-R": 0.74664,
+          "Box-F1": 0.75059,
+          "mAP50": 0.78543,
+          "mAP50-95": 0.44562
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.73484,
+          "Box-R": 0.49792,
+          "Box-F1": 0.59362,
+          "mAP50": 0.55867,
+          "mAP50-95": 0.40919
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.71523,
+          "Box-R": 0.53091,
+          "Box-F1": 0.60944,
+          "mAP50": 0.58679,
+          "mAP50-95": 0.39976
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.61179,
+          "Box-R": 0.46536,
+          "Box-F1": 0.52862,
+          "mAP50": 0.48017,
+          "mAP50-95": 0.22572
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.70699,
+          "Box-R": 0.42687,
+          "Box-F1": 0.53233,
+          "mAP50": 0.47713,
+          "mAP50-95": 0.22215
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.63632,
+          "Box-R": 0.61804,
+          "Box-F1": 0.62704,
+          "mAP50": 0.59702,
+          "mAP50-95": 0.22189
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.68011,
+          "Box-R": 0.67253,
+          "Box-F1": 0.6763,
+          "mAP50": 0.66932,
+          "mAP50-95": 0.33294
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.11989,
+          "mAP50-95": 0.06046
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    },
+    "onnx_allconv_int8__ort-cuda": {
+      "images": 20000,
+      "detections": 3151103,
+      "targets": 367728,
+      "metrics/precision(B)": 0.7286009121749214,
+      "metrics/recall(B)": 0.49002561226416164,
+      "metrics/mAP50(B)": 0.5382505354354002,
+      "metrics/mAP50-95(B)": 0.28613109323899183,
+      "fitness": 0.28613109323899183,
+      "per_class": [
+        {
+          "Class": "person",
+          "Images": 6213,
+          "Instances": 24650,
+          "Box-P": 0.74799,
+          "Box-R": 0.5451,
+          "Box-F1": 0.63063,
+          "mAP50": 0.62626,
+          "mAP50-95": 0.30853
+        },
+        {
+          "Class": "rider",
+          "Images": 1004,
+          "Instances": 1294,
+          "Box-P": 0.74917,
+          "Box-R": 0.4289,
+          "Box-F1": 0.5455,
+          "mAP50": 0.49616,
+          "mAP50-95": 0.23481
+        },
+        {
+          "Class": "car",
+          "Images": 19776,
+          "Instances": 205150,
+          "Box-P": 0.75436,
+          "Box-R": 0.74685,
+          "Box-F1": 0.75058,
+          "mAP50": 0.78522,
+          "mAP50-95": 0.4456
+        },
+        {
+          "Class": "bus",
+          "Images": 2459,
+          "Instances": 3217,
+          "Box-P": 0.73245,
+          "Box-R": 0.49357,
+          "Box-F1": 0.58974,
+          "mAP50": 0.56003,
+          "mAP50-95": 0.40905
+        },
+        {
+          "Class": "truck",
+          "Images": 5500,
+          "Instances": 8704,
+          "Box-P": 0.71666,
+          "Box-R": 0.53435,
+          "Box-F1": 0.61222,
+          "mAP50": 0.5877,
+          "mAP50-95": 0.40038
+        },
+        {
+          "Class": "bike",
+          "Images": 1182,
+          "Instances": 1998,
+          "Box-P": 0.59849,
+          "Box-R": 0.45435,
+          "Box-F1": 0.51655,
+          "mAP50": 0.48033,
+          "mAP50-95": 0.22399
+        },
+        {
+          "Class": "motor",
+          "Images": 640,
+          "Instances": 841,
+          "Box-P": 0.67087,
+          "Box-R": 0.40666,
+          "Box-F1": 0.50637,
+          "mAP50": 0.46266,
+          "mAP50-95": 0.21908
+        },
+        {
+          "Class": "traffic light",
+          "Images": 11051,
+          "Instances": 52840,
+          "Box-P": 0.63537,
+          "Box-R": 0.61749,
+          "Box-F1": 0.6263,
+          "mAP50": 0.59717,
+          "mAP50-95": 0.22248
+        },
+        {
+          "Class": "traffic sign",
+          "Images": 16432,
+          "Instances": 69006,
+          "Box-P": 0.68065,
+          "Box-R": 0.67298,
+          "Box-F1": 0.67679,
+          "mAP50": 0.66865,
+          "mAP50-95": 0.33242
+        },
+        {
+          "Class": "train",
+          "Images": 26,
+          "Instances": 28,
+          "Box-P": 1.0,
+          "Box-R": 0.0,
+          "Box-F1": 0.0,
+          "mAP50": 0.11833,
+          "mAP50-95": 0.06496
+        }
+      ],
+      "scope": "full_prepared_test_split"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 #include "benchmark.hpp"
+#include "engine_artifact.hpp"
 #include "image_processor.hpp"
 #include "inference_engine.hpp"
 #include "postprocess.hpp"
@@ -6,6 +7,7 @@
 #include <opencv2/core.hpp>
 
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -67,6 +69,29 @@ void require_throws(
     }
 
     throw TestFailure{std::string{message}};
+}
+
+void test_engine_envelope() {
+    const std::vector<std::uint8_t> raw{'p', 't', 'r', 't', 0, 42};
+    const auto unchanged = edge::tensorrt_payload(raw);
+    require(unchanged.data == raw.data() && unchanged.size == raw.size(), "Raw plan changed.");
+    const std::string json = R"({"names":{"0":"car"},"args":{"int8":true},"shape":[1,3,640,640],"dla":null,"x":-1.2e+3})";
+    std::vector<std::uint8_t> packed(4);
+    for (unsigned i = 0; i < 4; ++i) packed[i] = static_cast<std::uint8_t>(json.size() >> (8 * i));
+    packed.insert(packed.end(), json.begin(), json.end());
+    packed.insert(packed.end(), raw.begin(), raw.end());
+    const auto plan = edge::tensorrt_payload(packed);
+    require(plan.metadata_bytes == json.size() && plan.size == raw.size()
+        && std::equal(raw.begin(), raw.end(), plan.data), "Envelope damaged the engine payload.");
+    auto broken = packed;
+    broken[0] = 255;
+    require_throws([&] { edge::tensorrt_payload(broken); }, "Truncated metadata must fail.");
+    broken = packed;
+    broken[5] = '!';
+    require_throws([&] { edge::tensorrt_payload(broken); }, "Malformed metadata must fail.");
+    packed.resize(4 + json.size());
+    require_throws([&] { edge::tensorrt_payload(packed); }, "Missing plan must fail.");
+    require_throws([] { edge::tensorrt_payload({}); }, "Empty artifact must fail.");
 }
 
 void test_letterbox_geometry() {
@@ -259,6 +284,97 @@ void test_postprocess_validation_and_restoration() {
         },
         "Null non-empty output view must throw."
     );
+}
+
+void test_preprocess_float16_rounding_and_layout() {
+    // Exercise the public preprocessing path, not a second copy of its half
+    // conversion algorithm. Every input here is an exact binary32 value.
+    const std::array<std::pair<float, std::uint16_t>, 11> cases{{
+        {0.0F, 0x0000U},
+        {1.0F, 0x3C00U},
+        {1.00048828125F, 0x3C00U},       // Tie: even lower mantissa.
+        {1.00146484375F, 0x3C02U},       // Tie: even upper mantissa.
+        {-1.00048828125F, 0xBC00U},
+        {0x1p-24F, 0x0001U},           // Smallest half subnormal.
+        {0x1p-25F, 0x0000U},           // Tie to zero.
+        {0x1.8p-24F, 0x0002U},         // Subnormal tie to even.
+        {0x1.ff8p-15F, 0x03FFU},       // Largest half subnormal.
+        {0x1.ffcp-15F, 0x0400U},       // Tie into the normal range.
+        {65504.0F, 0x7BFFU}
+    }};
+    cv::Mat black(1, 1, CV_8UC3, cv::Scalar{0, 0, 0});
+    for (const auto& sample : cases) {
+        edge::PreprocessConfig config{};
+        config.network_size = {1, 1};
+        config.pixel_scale = 1.0F;
+        config.mean.fill(-sample.first);
+        edge::ImageProcessor processor{config};
+        std::array<std::uint16_t, 3> tensor{};
+        static_cast<void>(processor.preprocess(
+            black, edge::MutableTensorView::float16(tensor.data(), tensor.size())
+        ));
+        for (const auto bits : tensor) {
+            require(bits == sample.second, "Binary16 ties-to-even mismatch.");
+        }
+    }
+
+    edge::PreprocessConfig config{};
+    config.network_size = {2, 1};
+    config.pixel_scale = 1.0F;
+    edge::ImageProcessor processor{config};
+    cv::Mat storage(3, 4, CV_8UC3, cv::Scalar{255, 255, 255});
+    cv::Mat image = storage(cv::Rect{1, 1, 2, 1});
+    image.at<cv::Vec3b>(0, 0) = {1U, 2U, 4U};
+    image.at<cv::Vec3b>(0, 1) = {8U, 16U, 32U};
+    std::array<std::uint16_t, 6> tensor{};
+    static_cast<void>(processor.preprocess(
+        image, edge::MutableTensorView::float16(tensor.data(), tensor.size())
+    ));
+    require(
+        tensor == std::array<std::uint16_t, 6>{
+            0x4400U, 0x5000U, 0x4000U, 0x4C00U, 0x3C00U, 0x4800U
+        },
+        "FP16 preprocessing must write RGB planes in NCHW order."
+    );
+}
+
+void test_postprocess_odd_resize_and_strided_rows() {
+    const auto transform = edge::ImageProcessor::calculate_letterbox_transform(
+        {1279, 719}, edge::PreprocessConfig{}
+    );
+    require(transform.resized_size.width == 640
+        && transform.resized_size.height == 360,
+        "Odd source dimensions must be independently rounded.");
+    require(transform.scale_x != transform.scale_y,
+        "Fixture must exercise separate X/Y scale factors.");
+
+    // Half-representable XYXY rows with padding between rows. Overlapping
+    // detections must survive: this end-to-end head must not receive more NMS.
+    const std::array<float, 32> rows{
+        64, 180, 576, 450, 0.75F, 2, -999, -999,
+        64, 180, 576, 450, 0.5F, 2, -999, -999,
+        64, 180, 576, 450, 0.25F, 2, -999, -999,
+        64, 180, 576, 450, 0.875F, 1, -999, -999
+    };
+    edge::Postprocessor postprocessor{};
+    edge::DetectionBuffer detections{};
+    const auto summary = postprocessor.process(
+        {rows.data(), rows.size(), 4U, 8U}, transform, detections
+    );
+    require(detections.size() == 2U, "Threshold equality must be rejected.");
+    require(summary.candidates_examined == 3U
+        && summary.rejected_by_confidence == 2U,
+        "Sorted threshold cutoff must stop before trailing rows.");
+    for (const auto& detection : detections) {
+        require_near(detection.box.x_min, 64.0 * 1279.0 / 640.0,
+            2.0e-4, "Odd-size x_min restoration mismatch");
+        require_near(detection.box.x_max, 576.0 * 1279.0 / 640.0,
+            2.0e-4, "Odd-size x_max restoration mismatch");
+        require_near(detection.box.y_min, 40.0 * 719.0 / 360.0,
+            2.0e-4, "Odd-size y_min restoration mismatch");
+        require_near(detection.box.y_max, 310.0 * 719.0 / 360.0,
+            2.0e-4, "Odd-size y_max restoration mismatch");
+    }
 }
 
 void test_benchmark_statistics() {
@@ -459,6 +575,7 @@ int main(int argc, char** argv) {
         int failures = 0;
 
         if (options.run_unit) {
+            failures += run_test("raw_and_prefixed_engine_envelopes", test_engine_envelope);
             failures += run_test(
                 "letterbox_geometry",
                 test_letterbox_geometry
@@ -470,6 +587,14 @@ int main(int argc, char** argv) {
             failures += run_test(
                 "postprocess_validation_and_restoration",
                 test_postprocess_validation_and_restoration
+            );
+            failures += run_test(
+                "preprocess_float16_rounding_and_layout",
+                test_preprocess_float16_rounding_and_layout
+            );
+            failures += run_test(
+                "postprocess_odd_resize_and_strided_rows",
+                test_postprocess_odd_resize_and_strided_rows
             );
             failures += run_test(
                 "benchmark_statistics",

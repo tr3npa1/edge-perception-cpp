@@ -1,0 +1,26 @@
+[
+  {
+    "file": "example-1.jpg",
+    "backend": "fused-trt",
+    "precision": "fp16",
+    "source": "benchmarks/all_20261018_151027_308/performance/runs/c6054546e1cf/app_output/000000_detections.jpg",
+    "sha256": "e2269283399fdfcf707ccd2ff50581e09235de01bf2ecd255d3eeddd59c3f4ea",
+    "selection": "First saved image of the fixed-input smoke run; illustrative, not an accuracy test"
+  },
+  {
+    "file": "example-2.jpg",
+    "backend": "native-trt",
+    "precision": "fp16",
+    "source": "benchmarks/all_20261018_151027_308/performance/runs/7ce35463d0e1/app_output/000000_detections.jpg",
+    "sha256": "e2269283399fdfcf707ccd2ff50581e09235de01bf2ecd255d3eeddd59c3f4ea",
+    "selection": "First saved image of the fixed-input smoke run; illustrative, not an accuracy test"
+  },
+  {
+    "file": "example-3.jpg",
+    "backend": "fused-trt",
+    "precision": "int8",
+    "source": "benchmarks/all_20261018_151027_308/performance/runs/70c959072270/app_output/000000_detections.jpg",
+    "sha256": "9427b16586f97446e2baa10467d559e5e5023fce6b0e8f1936e464b3208ecd80",
+    "selection": "First saved image of the fixed-input smoke run; illustrative, not an accuracy test"
+  }
+]
